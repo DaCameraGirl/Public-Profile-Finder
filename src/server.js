@@ -90,6 +90,7 @@ const server = createServer(async (request, response) => {
         candidateCount: candidates.length,
         scoredCandidateCount: ranked.meta.scoredCandidateCount,
         hiddenCandidateCount: ranked.meta.hiddenCandidateCount,
+        conflictingCandidateCount: ranked.meta.conflictingCandidateCount,
         resultCount: ranked.results.length,
         filter: ranked.meta,
         results: ranked.results

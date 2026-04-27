@@ -10,7 +10,8 @@ function isNoResultsMessage(message) {
 }
 
 function buildQuery(plan) {
-  const siteFilter = SUPPORTED_PROFILE_DOMAINS.map((domain) => `site:${domain}`).join(" OR ");
+  const domains = plan.domains?.length ? plan.domains : SUPPORTED_PROFILE_DOMAINS;
+  const siteFilter = domains.map((domain) => `site:${domain}`).join(" OR ");
   return `${plan.q} (${siteFilter})`;
 }
 
@@ -19,7 +20,7 @@ async function fetchPlanResults(plan, apiKey) {
     engine: "google",
     q: buildQuery(plan),
     api_key: apiKey,
-    num: "10",
+    num: "20",
     hl: DEFAULT_LANGUAGE,
     gl: DEFAULT_COUNTRY,
     safe: "active",

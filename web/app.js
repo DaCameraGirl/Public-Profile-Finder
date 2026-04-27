@@ -3,6 +3,7 @@ const results = document.querySelector("#results");
 const resultMeta = document.querySelector("#result-meta");
 const resultFlags = document.querySelector("#result-flags");
 const demoButton = document.querySelector("#demo-button");
+const clearButton = document.querySelector("#clear-button");
 const sourceStatus = document.querySelector("#source-status");
 const sourceNote = document.querySelector("#source-note");
 
@@ -77,6 +78,12 @@ function renderResultFlags(payload) {
   if (payload.hiddenCandidateCount > 0) {
     parts.push(
       `<span class="summary-chip">Hidden weak matches: ${escapeHtml(String(payload.hiddenCandidateCount))}</span>`
+    );
+  }
+
+  if (payload.conflictingCandidateCount > 0) {
+    parts.push(
+      `<span class="summary-chip">Conflicting clue hits: ${escapeHtml(String(payload.conflictingCandidateCount))}</span>`
     );
   }
 
@@ -195,6 +202,14 @@ demoButton.addEventListener("click", () => {
       input.value = value;
     }
   });
+});
+
+clearButton.addEventListener("click", () => {
+  form.reset();
+  resultFlags.innerHTML = "";
+  results.classList.add("empty");
+  results.innerHTML = "<p>No results yet.</p>";
+  resultMeta.textContent = "Run a search to see scored matches.";
 });
 
 form.addEventListener("submit", async (event) => {

@@ -121,6 +121,12 @@ h2 {
   margin-bottom: 18px;
 }
 
+.button-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .panel-header p {
   margin: 8px 0 0;
   color: var(--muted);

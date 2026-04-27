@@ -93,10 +93,28 @@ const PLATFORM_RULES = [
         "trending"
       ].includes(segments[0]),
     extractUsername: (segments) => segments[0]
+  },
+  {
+    platform: "LinkedIn",
+    domains: ["linkedin.com"],
+    isProfilePath: (segments) =>
+      segments.length >= 2 &&
+      ["in", "pub"].includes(segments[0]) &&
+      Boolean(segments[1]),
+    extractUsername: (segments) => segments[1]
+  },
+  {
+    platform: "YouTube",
+    domains: ["youtube.com"],
+    isProfilePath: (segments) =>
+      (segments.length === 1 && Boolean(segments[0]?.startsWith("@"))) ||
+      (segments.length === 2 && ["c", "channel", "user"].includes(segments[0]) && Boolean(segments[1])),
+    extractUsername: (segments) => (segments[0]?.startsWith("@") ? segments[0].slice(1) : segments[1])
   }
 ];
 
 export const SUPPORTED_PROFILE_DOMAINS = PLATFORM_RULES.flatMap((rule) => rule.domains);
+const BROADER_PROFILE_DOMAINS = ["github.com", "linkedin.com", "youtube.com", "reddit.com"];
 
 export function dedupe(values) {
   return [...new Set(values.filter(Boolean))];
@@ -188,16 +206,30 @@ export function buildSearchPlans(query) {
   }
 
   if (query.name) {
-    const terms = [
-      `"${query.name}"`,
-      ...query.bioKeywords.slice(0, 3),
-      ...query.locationHints.slice(0, 2)
-    ].filter(Boolean);
+    plans.push({
+      label: "Name exact",
+      q: clipText(`"${query.name}"`, 220)
+    });
 
     plans.push({
-      label: "Name and public clues",
-      q: clipText(terms.join(" "), 220)
+      label: "Name on broader public profiles",
+      q: clipText(`"${query.name}"`, 220),
+      domains: BROADER_PROFILE_DOMAINS
     });
+
+    if (query.locationHints.length > 0) {
+      plans.push({
+        label: "Name and location",
+        q: clipText(`"${query.name}" ${query.locationHints.slice(0, 3).join(" ")}`, 220)
+      });
+    }
+
+    if (query.bioKeywords.length > 0) {
+      plans.push({
+        label: "Name and keywords",
+        q: clipText(`"${query.name}" ${query.bioKeywords.slice(0, 4).join(" ")}`, 220)
+      });
+    }
   }
 
   if (!plans.length) {
@@ -211,7 +243,7 @@ export function buildSearchPlans(query) {
     }
   }
 
-  return dedupe(plans.map((plan) => JSON.stringify(plan))).map((plan) => JSON.parse(plan));
+  return dedupe(plans.map((plan) => JSON.stringify(plan))).map((plan) => JSON.parse(plan)).slice(0, 6);
 }
 
 export function mapSearchResultsToCandidates(results, plan, mapper) {

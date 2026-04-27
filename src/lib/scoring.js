@@ -43,6 +43,13 @@ function compactSignals(values) {
 }
 
 function buildMatchTier(score, signals) {
+  if (signals.nameConflict && signals.signalCount < 3) {
+    return {
+      key: "possible",
+      label: "Conflicting clues"
+    };
+  }
+
   if (signals.exactHandle || signals.sharedPhotos.length > 0 || (signals.exactName && signals.signalCount >= 2)) {
     return {
       key: "high",
@@ -71,8 +78,20 @@ function passesFilter(candidate, sourceMode) {
 
   const { signals } = candidate;
 
-  if (signals.exactHandle || signals.exactName || signals.sharedPhotos.length > 0) {
+  if (signals.sharedPhotos.length > 0) {
     return true;
+  }
+
+  if (signals.exactHandle && !signals.nameConflict) {
+    return true;
+  }
+
+  if (signals.exactName) {
+    return true;
+  }
+
+  if (signals.nameConflict && signals.signalCount < 3) {
+    return false;
   }
 
   return candidate.score >= thresholds.minimumScore && signals.signalCount >= thresholds.minimumSignals;
@@ -94,6 +113,7 @@ export function scoreCandidate(query, candidate) {
   let exactHandle = false;
   let fuzzyHandle = false;
   let exactName = false;
+  let nameConflict = false;
 
   const candidateHandle = normalizeText(candidate.username);
   const candidateName = normalizeText(candidate.displayName);
@@ -128,6 +148,8 @@ export function scoreCandidate(query, candidate) {
       if (sharedNameTokens.length > 0) {
         score += Math.min(WEIGHTS.exactName, sharedNameTokens.length * WEIGHTS.nameToken);
         reasons.push(`Shared name tokens: ${sharedNameTokens.join(", ")}`);
+      } else if (query.handles.length > 0) {
+        nameConflict = true;
       }
     }
   }
@@ -151,10 +173,15 @@ export function scoreCandidate(query, candidate) {
   }
 
   const sharedNameTokens = exactName ? unique(tokenize(query.name)) : unique(tokenize(query.name)).filter((token) => candidateName.includes(token));
+  if (nameConflict) {
+    reasons.push(`Known handle and public name do not strongly align`);
+  }
+
   const signals = {
     exactHandle,
     fuzzyHandle,
     exactName,
+    nameConflict,
     sharedNameTokens,
     sharedBioTokens,
     sharedLocationTokens,
@@ -189,12 +216,14 @@ export function rankCandidates(rawQuery, candidates, options = {}) {
 
   const visibleResults = scoredCandidates.filter((candidate) => passesFilter(candidate, sourceMode));
   const hiddenResults = scoredCandidates.filter((candidate) => !passesFilter(candidate, sourceMode));
+  const conflictingCandidateCount = scoredCandidates.filter((candidate) => candidate.signals.nameConflict).length;
 
   return {
     results: visibleResults,
     meta: {
       scoredCandidateCount: scoredCandidates.length,
       hiddenCandidateCount: hiddenResults.length,
+      conflictingCandidateCount,
       visibleCandidateCount: visibleResults.length,
       sourceMode,
       minimumSignals: sourceMode === "live" ? 2 : 2,
