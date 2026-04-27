@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Public Profile Finder</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="backdrop"></div>
+    <main class="layout">
+      <section class="hero">
+        <p class="eyebrow">Public Signals Only</p>
+        <h1>Public Profile Finder</h1>
+        <p class="lede">
+          Score candidate public profiles using names, handles, bio clues, public location text, and
+          reused public photo URLs. No face recognition. No private-account access.
+        </p>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Search Inputs</h2>
+          <button id="demo-button" class="secondary" type="button">Load Demo</button>
+        </div>
+
+        <form id="search-form" class="grid">
+          <label>
+            <span>Full name</span>
+            <input id="name" name="name" placeholder="Maya Torres" />
+          </label>
+
+          <label>
+            <span>Known handles</span>
+            <input id="handles" name="handles" placeholder="maya.eats.bk, mayatorres" />
+          </label>
+
+          <label>
+            <span>Bio keywords</span>
+            <input id="bioKeywords" name="bioKeywords" placeholder="supper clubs, vintage, coffee" />
+          </label>
+
+          <label>
+            <span>Public location hints</span>
+            <input id="locationHints" name="locationHints" placeholder="Brooklyn, NY" />
+          </label>
+
+          <label class="full-width">
+            <span>Known public photo URLs</span>
+            <input
+              id="photoHints"
+              name="photoHints"
+              placeholder="https://assets.example.com/photos/maya-brunch-2024.jpg"
+            />
+          </label>
+
+          <div class="actions">
+            <button class="primary" type="submit">Find Candidates</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel notice">
+        <h2>Boundaries</h2>
+        <p>
+          This MVP is for public-profile review only. It does not identify people by face, track live
+          location, access private accounts, or bypass platform protections.
+        </p>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Ranked Candidates</h2>
+          <p id="result-meta">Run a search to see scored matches.</p>
+        </div>
+        <div id="results" class="results empty">
+          <p>No results yet.</p>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
