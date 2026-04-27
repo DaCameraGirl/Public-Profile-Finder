@@ -2,6 +2,8 @@ const form = document.querySelector("#search-form");
 const results = document.querySelector("#results");
 const resultMeta = document.querySelector("#result-meta");
 const demoButton = document.querySelector("#demo-button");
+const sourceStatus = document.querySelector("#source-status");
+const sourceNote = document.querySelector("#source-note");
 
 const demoQuery = {
   name: "Maya Torres",
@@ -39,21 +41,39 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
+function renderSourceState(source) {
+  if (!source) {
+    sourceStatus.textContent = "Source status unavailable.";
+    sourceNote.textContent = "Search source information could not be loaded.";
+    return;
+  }
+
+  sourceStatus.textContent =
+    source.mode === "live"
+      ? `Live source: ${source.label}`
+      : `Demo mode: ${source.label}`;
+  sourceNote.textContent = source.note || "";
+}
+
 function renderResults(payload) {
   if (!payload.results.length) {
     results.classList.add("empty");
     results.innerHTML = "<p>No public candidates matched these inputs.</p>";
-    resultMeta.textContent = "0 candidates found.";
+    resultMeta.textContent = `0 candidates found via ${payload.source.label}.`;
     return;
   }
 
   results.classList.remove("empty");
-  resultMeta.textContent = `${payload.resultCount} candidate${payload.resultCount === 1 ? "" : "s"} found.`;
+  resultMeta.textContent =
+    `${payload.resultCount} candidate${payload.resultCount === 1 ? "" : "s"} found via ${payload.source.label}.`;
 
   results.innerHTML = payload.results
     .map((candidate) => {
       const reasons = candidate.reasons
         .map((reason) => `<span class="reason">${escapeHtml(reason)}</span>`)
+        .join("");
+      const sourceQueries = (candidate.sourceQueries || [])
+        .map((query) => `<span class="source-chip">${escapeHtml(query)}</span>`)
         .join("");
 
       return `
@@ -73,6 +93,7 @@ function renderResults(payload) {
             <a href="${escapeHtml(candidate.profileUrl)}" target="_blank" rel="noreferrer">Open profile</a>
           </div>
           <p>${escapeHtml(candidate.bio || "No public bio")}</p>
+          <div class="reason-list">${sourceQueries}</div>
           <div class="reason-list">${reasons}</div>
         </article>
       `;
@@ -81,7 +102,7 @@ function renderResults(payload) {
 }
 
 async function runSearch(payload) {
-  resultMeta.textContent = "Searching mock public profiles...";
+  resultMeta.textContent = "Searching public profiles...";
   results.classList.add("empty");
   results.innerHTML = "<p>Scoring candidates...</p>";
 
@@ -98,7 +119,19 @@ async function runSearch(payload) {
   }
 
   const result = await response.json();
+  renderSourceState(result.source);
   renderResults(result);
+}
+
+async function loadHealth() {
+  const response = await fetch("/api/health");
+
+  if (!response.ok) {
+    throw new Error(`Health check failed with status ${response.status}`);
+  }
+
+  const payload = await response.json();
+  renderSourceState(payload.source);
 }
 
 demoButton.addEventListener("click", () => {
@@ -120,4 +153,9 @@ form.addEventListener("submit", async (event) => {
     results.innerHTML = `<p>${escapeHtml(error.message || "Search failed.")}</p>`;
     resultMeta.textContent = "Search failed.";
   }
+});
+
+loadHealth().catch((error) => {
+  sourceStatus.textContent = "Source check failed.";
+  sourceNote.textContent = escapeHtml(error.message || "Unable to load source status.");
 });

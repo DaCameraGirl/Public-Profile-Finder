@@ -54,8 +54,8 @@ export function scoreCandidate(query, candidate) {
 
   const candidateHandle = normalizeText(candidate.username);
   const candidateName = normalizeText(candidate.displayName);
-  const candidateBioTokens = new Set(tokenize(candidate.bio));
-  const candidateLocationTokens = new Set(tokenize(candidate.location));
+  const candidateBioTokens = new Set(tokenize(candidate.bio || candidate.publicText));
+  const candidateLocationTokens = new Set(tokenize(candidate.location || candidate.publicText));
   const candidatePhotos = new Set((candidate.photoUrls || []).map(photoFingerprint));
 
   if (query.handles.includes(candidateHandle)) {

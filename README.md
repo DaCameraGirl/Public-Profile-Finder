@@ -12,7 +12,12 @@ This project is intentionally constrained:
 - No live or inferred device location
 - No covert monitoring
 
-The current MVP scores mock public profiles with these signals:
+The app now has two source modes:
+
+- demo mode using bundled mock profiles
+- live mode using Brave Search API over public web results on supported profile domains
+
+It scores public candidates with these signals:
 
 - display name similarity
 - known handle similarity
@@ -28,13 +33,29 @@ npm start
 
 Then open `http://localhost:4173`.
 
+## Live Source Setup
+
+Create a local `.env` file from `.env.example` and add your Brave API key:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Then set:
+
+```text
+BRAVE_SEARCH_API_KEY=your_api_key_here
+```
+
+With no key present, the app stays in demo mode.
+
 ## Why This Shape
 
 Step one is a runnable repo with a clear policy boundary and a scoring engine you can extend later with official APIs or compliant public-web connectors.
 
 ## Next Steps
 
-1. Replace mock profiles with API-backed public sources.
-2. Add source-specific adapters with rate limits and terms checks.
+1. Add a second live source adapter so results do not depend on one provider.
+2. Add source-specific rate limits and retry handling.
 3. Add saved searches and audit logs.
 4. Add manual review tooling before any result is treated as a match.

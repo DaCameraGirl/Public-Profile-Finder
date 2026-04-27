@@ -2,13 +2,17 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { mockProfiles } from "./lib/mock-data.js";
+import { loadEnvFile } from "./lib/env.js";
 import { rankCandidates, sanitizeQuery } from "./lib/scoring.js";
+import { getSourceStatus, loadSourceCandidates } from "./lib/sources/search-source.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
 const webRoot = path.join(projectRoot, "web");
+
+loadEnvFile(projectRoot);
+
 const port = Number(process.env.PORT || 4173);
 
 const contentTypes = {
@@ -54,17 +58,23 @@ const server = createServer(async (request, response) => {
     const url = new URL(request.url, `http://${request.headers.host}`);
 
     if (request.method === "GET" && url.pathname === "/api/health") {
-      sendJson(response, 200, { ok: true });
+      sendJson(response, 200, {
+        ok: true,
+        source: getSourceStatus()
+      });
       return;
     }
 
     if (request.method === "POST" && url.pathname === "/api/search") {
       const rawBody = await readRequestBody(request);
       const query = sanitizeQuery(JSON.parse(rawBody || "{}"));
-      const results = rankCandidates(query, mockProfiles);
+      const { source, candidates } = await loadSourceCandidates(query);
+      const results = rankCandidates(query, candidates);
 
       sendJson(response, 200, {
+        source,
         query,
+        candidateCount: candidates.length,
         resultCount: results.length,
         results
       });

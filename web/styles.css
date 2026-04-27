@@ -81,6 +81,17 @@ h2 {
   color: var(--muted);
 }
 
+.status-pill {
+  display: inline-flex;
+  margin: 18px 0 0;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.68);
+  border: 1px solid rgba(16, 32, 52, 0.12);
+  color: var(--ink);
+  font-size: 0.95rem;
+}
+
 .panel {
   margin-top: 18px;
   padding: 24px;
@@ -95,6 +106,11 @@ h2 {
   background:
     linear-gradient(90deg, rgba(209, 77, 36, 0.08), transparent 50%),
     var(--panel);
+}
+
+.notice-copy {
+  margin: 12px 0 0;
+  color: var(--muted);
 }
 
 .panel-header {
@@ -243,6 +259,14 @@ button {
   border-radius: 999px;
   background: rgba(12, 125, 120, 0.1);
   color: #094846;
+  font-size: 0.92rem;
+}
+
+.source-chip {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(209, 77, 36, 0.1);
+  color: var(--accent-dark);
   font-size: 0.92rem;
 }
 
