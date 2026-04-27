@@ -54,6 +54,45 @@ const PLATFORM_RULES = [
     domains: ["reddit.com"],
     isProfilePath: (segments) => segments.length === 2 && ["user", "u"].includes(segments[0]) && Boolean(segments[1]),
     extractUsername: (segments) => segments[1]
+  },
+  {
+    platform: "GitHub",
+    domains: ["github.com"],
+    isProfilePath: (segments) =>
+      segments.length === 1 &&
+      Boolean(segments[0]) &&
+      ![
+        "about",
+        "account",
+        "apps",
+        "blog",
+        "collections",
+        "contact",
+        "customer-stories",
+        "enterprise",
+        "events",
+        "explore",
+        "features",
+        "gist",
+        "issues",
+        "login",
+        "marketplace",
+        "new",
+        "notifications",
+        "orgs",
+        "organizations",
+        "pricing",
+        "pulls",
+        "search",
+        "security",
+        "settings",
+        "site",
+        "sponsors",
+        "team",
+        "topics",
+        "trending"
+      ].includes(segments[0]),
+    extractUsername: (segments) => segments[0]
   }
 ];
 
