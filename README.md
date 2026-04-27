@@ -15,7 +15,7 @@ This project is intentionally constrained:
 The app now has two source modes:
 
 - demo mode using bundled mock profiles
-- live mode using Brave Search API over public web results on supported profile domains
+- live mode using SerpApi or Brave Search over public web results on supported profile domains
 
 It scores public candidates with these signals:
 
@@ -35,7 +35,7 @@ Then open `http://localhost:4173`.
 
 ## Live Source Setup
 
-Create a local `.env` file from `.env.example` and add your Brave API key:
+Create a local `.env` file from `.env.example` and add your preferred live search key:
 
 ```powershell
 Copy-Item .env.example .env
@@ -44,10 +44,11 @@ Copy-Item .env.example .env
 Then set:
 
 ```text
+SERPAPI_API_KEY=your_api_key_here
 BRAVE_SEARCH_API_KEY=your_api_key_here
 ```
 
-With no key present, the app stays in demo mode.
+`SERPAPI_API_KEY` is preferred when both are present. With no key present, the app stays in demo mode.
 
 ## Why This Shape
 
@@ -55,7 +56,7 @@ Step one is a runnable repo with a clear policy boundary and a scoring engine yo
 
 ## Next Steps
 
-1. Add a second live source adapter so results do not depend on one provider.
+1. Add result enrichment for public profile pages after discovery.
 2. Add source-specific rate limits and retry handling.
 3. Add saved searches and audit logs.
 4. Add manual review tooling before any result is treated as a match.

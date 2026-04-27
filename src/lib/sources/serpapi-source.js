@@ -1,47 +1,58 @@
-import { buildSearchPlans, dedupe, mapSearchResultsToCandidates } from "./profile-search-utils.js";
+import { buildSearchPlans, dedupe, mapSearchResultsToCandidates, SUPPORTED_PROFILE_DOMAINS } from "./profile-search-utils.js";
 
-const DEFAULT_COUNTRY = "US";
+const DEFAULT_COUNTRY = "us";
 const DEFAULT_LANGUAGE = "en";
+const DEFAULT_LOCATION = "United States";
+
+function buildQuery(plan) {
+  const siteFilter = SUPPORTED_PROFILE_DOMAINS.map((domain) => `site:${domain}`).join(" OR ");
+  return `${plan.q} (${siteFilter})`;
+}
 
 async function fetchPlanResults(plan, apiKey) {
   const params = new URLSearchParams({
-    q: plan.q,
-    count: "10",
-    country: DEFAULT_COUNTRY,
-    search_lang: DEFAULT_LANGUAGE,
-    safesearch: "moderate",
-    extra_snippets: "true"
+    engine: "google",
+    q: buildQuery(plan),
+    api_key: apiKey,
+    num: "10",
+    hl: DEFAULT_LANGUAGE,
+    gl: DEFAULT_COUNTRY,
+    safe: "active",
+    location: DEFAULT_LOCATION
   });
 
-  const response = await fetch(`https://api.search.brave.com/res/v1/web/search?${params}`, {
+  const response = await fetch(`https://serpapi.com/search.json?${params}`, {
     headers: {
-      Accept: "application/json",
-      "Accept-Encoding": "gzip",
-      "X-Subscription-Token": apiKey
+      Accept: "application/json"
     }
   });
 
   if (!response.ok) {
-    throw new Error(`Brave Search API returned ${response.status}`);
+    throw new Error(`SerpApi returned ${response.status}`);
   }
 
   const payload = await response.json();
-  return payload?.web?.results || [];
+
+  if (payload.error) {
+    throw new Error(payload.error);
+  }
+
+  return payload.organic_results || [];
 }
 
-export function getBraveSourceStatus(apiKey) {
+export function getSerpApiSourceStatus(apiKey) {
   return apiKey
     ? {
-        id: "brave-search",
-        label: "Brave Search API",
+        id: "serpapi-google",
+        label: "SerpApi",
         mode: "live",
         configured: true,
-        note: "Live public-web search is enabled through Brave Search."
+        note: "Live public-web search is enabled through SerpApi's Google results."
       }
     : null;
 }
 
-export async function searchBraveProfiles(query, apiKey) {
+export async function searchSerpApiProfiles(query, apiKey) {
   const plans = buildSearchPlans(query);
   if (!plans.length) {
     return [];
@@ -55,10 +66,10 @@ export async function searchBraveProfiles(query, apiKey) {
   for (const { plan, results } of settledResults) {
     const candidates = mapSearchResultsToCandidates(results, plan, (result) => ({
       title: result.title,
-      url: result.url,
-      description: result.description,
-      extraSnippets: result.extra_snippets || [],
-      sourceLabel: "Brave Search API"
+      url: result.link,
+      description: result.snippet,
+      extraSnippets: [],
+      sourceLabel: "SerpApi"
     }));
 
     for (const candidate of candidates) {

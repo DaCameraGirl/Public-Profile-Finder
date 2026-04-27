@@ -1,18 +1,35 @@
-import { searchBraveProfiles, getBraveSourceStatus } from "./brave-search-source.js";
 import { searchMockProfiles, getMockSourceStatus } from "./mock-source.js";
+import { searchBraveProfiles, getBraveSourceStatus } from "./brave-search-source.js";
+import { searchSerpApiProfiles, getSerpApiSourceStatus } from "./serpapi-source.js";
 
 export function getSourceStatus() {
-  const apiKey = process.env.BRAVE_SEARCH_API_KEY?.trim();
-  return apiKey ? getBraveSourceStatus(apiKey) : getMockSourceStatus();
+  const serpApiKey = process.env.SERPAPI_API_KEY?.trim();
+  if (serpApiKey) {
+    return getSerpApiSourceStatus(serpApiKey);
+  }
+
+  const braveApiKey = process.env.BRAVE_SEARCH_API_KEY?.trim();
+  if (braveApiKey) {
+    return getBraveSourceStatus(braveApiKey);
+  }
+
+  return getMockSourceStatus();
 }
 
 export async function loadSourceCandidates(query) {
-  const apiKey = process.env.BRAVE_SEARCH_API_KEY?.trim();
-
-  if (apiKey) {
+  const serpApiKey = process.env.SERPAPI_API_KEY?.trim();
+  if (serpApiKey) {
     return {
-      source: getBraveSourceStatus(apiKey),
-      candidates: await searchBraveProfiles(query, apiKey)
+      source: getSerpApiSourceStatus(serpApiKey),
+      candidates: await searchSerpApiProfiles(query, serpApiKey)
+    };
+  }
+
+  const braveApiKey = process.env.BRAVE_SEARCH_API_KEY?.trim();
+  if (braveApiKey) {
+    return {
+      source: getBraveSourceStatus(braveApiKey),
+      candidates: await searchBraveProfiles(query, braveApiKey)
     };
   }
 
