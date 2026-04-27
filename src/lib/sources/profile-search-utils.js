@@ -1,3 +1,5 @@
+import { extractPublicLocation } from "../location.js";
+
 const PLATFORM_RULES = [
   {
     platform: "Instagram",
@@ -271,6 +273,7 @@ export function mapSearchResultsToCandidates(results, plan, mapper) {
     }
 
     const description = cleanText([mapped.description, ...(mapped.extraSnippets || [])].filter(Boolean).join(" "));
+    const publicLocation = extractPublicLocation([mapped.title, description].filter(Boolean).join(" "));
     const profileUrl = toCanonicalProfileUrl(mapped.url);
     const candidate = {
       id: `${rule.platform.toLowerCase()}-${username.toLowerCase()}`,
@@ -279,7 +282,7 @@ export function mapSearchResultsToCandidates(results, plan, mapper) {
       displayName: cleanSearchTitle(mapped.title, username, rule.platform),
       username,
       bio: description,
-      location: "",
+      location: publicLocation,
       photoUrls: [],
       publicText: cleanText([mapped.title, description].filter(Boolean).join(" ")),
       sourceLabel: mapped.sourceLabel,

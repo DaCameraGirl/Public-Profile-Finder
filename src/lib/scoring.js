@@ -1,3 +1,5 @@
+import { buildLocationTokens } from "./location.js";
+
 const WEIGHTS = {
   exactHandle: 38,
   fuzzyHandle: 18,
@@ -40,6 +42,19 @@ function photoFingerprint(url) {
 
 function compactSignals(values) {
   return values.filter((value) => value !== null && value !== undefined && value !== false);
+}
+
+function formatLocationMatches(tokens) {
+  const visibleTokens = tokens.filter((token) => !token.startsWith("state:"));
+  const canonicalStateTokens = visibleTokens.filter((token) => token.includes(" "));
+  if (canonicalStateTokens.length > 0) {
+    const withoutStateAbbreviations = visibleTokens.filter(
+      (token) => token.length > 2 || !tokens.includes(`state:${token}`)
+    );
+    return withoutStateAbbreviations;
+  }
+
+  return visibleTokens;
 }
 
 function buildMatchTier(score, signals) {
@@ -102,7 +117,7 @@ export function sanitizeQuery(payload) {
     name: String(payload?.name || "").trim(),
     handles: unique((payload?.handles || []).map(normalizeText)),
     bioKeywords: unique((payload?.bioKeywords || []).flatMap(tokenize)),
-    locationHints: unique((payload?.locationHints || []).flatMap(tokenize)),
+    locationHints: buildLocationTokens(payload?.locationHints || []),
     photoHints: unique((payload?.photoHints || []).map(photoFingerprint))
   };
 }
@@ -118,7 +133,7 @@ export function scoreCandidate(query, candidate) {
   const candidateHandle = normalizeText(candidate.username);
   const candidateName = normalizeText(candidate.displayName);
   const candidateBioTokens = new Set(tokenize(candidate.bio || candidate.publicText));
-  const candidateLocationTokens = new Set(tokenize(candidate.location || candidate.publicText));
+  const candidateLocationTokens = new Set(buildLocationTokens(candidate.location || candidate.publicText));
   const candidatePhotos = new Set((candidate.photoUrls || []).map(photoFingerprint));
 
   if (query.handles.includes(candidateHandle)) {
@@ -163,7 +178,7 @@ export function scoreCandidate(query, candidate) {
   const sharedLocationTokens = query.locationHints.filter((token) => candidateLocationTokens.has(token));
   if (sharedLocationTokens.length > 0) {
     score += WEIGHTS.locationOverlap;
-    reasons.push(`Public location overlap: ${sharedLocationTokens.join(", ")}`);
+    reasons.push(`Public location overlap: ${formatLocationMatches(sharedLocationTokens).join(", ")}`);
   }
 
   const sharedPhotos = query.photoHints.filter((fingerprint) => candidatePhotos.has(fingerprint));
