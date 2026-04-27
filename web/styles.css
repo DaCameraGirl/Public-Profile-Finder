@@ -127,6 +127,15 @@ h2 {
   flex-wrap: wrap;
 }
 
+.form-warning {
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(209, 77, 36, 0.1);
+  color: var(--accent-dark);
+  border: 1px solid rgba(209, 77, 36, 0.18);
+}
+
 .panel-header p {
   margin: 8px 0 0;
   color: var(--muted);

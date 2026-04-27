@@ -4,6 +4,8 @@ const resultMeta = document.querySelector("#result-meta");
 const resultFlags = document.querySelector("#result-flags");
 const demoButton = document.querySelector("#demo-button");
 const clearButton = document.querySelector("#clear-button");
+const nameOnlyButton = document.querySelector("#name-only-button");
+const formWarning = document.querySelector("#form-warning");
 const sourceStatus = document.querySelector("#source-status");
 const sourceNote = document.querySelector("#source-note");
 
@@ -22,6 +24,40 @@ function splitList(value) {
     .filter(Boolean);
 }
 
+function normalizeValue(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase();
+}
+
+function normalizeList(values) {
+  return values
+    .map((value) => normalizeValue(value))
+    .filter(Boolean)
+    .sort();
+}
+
+function sameList(left, right) {
+  return JSON.stringify(normalizeList(left)) === JSON.stringify(normalizeList(right));
+}
+
+function writeField(name, value) {
+  const input = form.querySelector(`[name="${name}"]`);
+  if (input) {
+    input.value = value;
+  }
+}
+
+function hideFormWarning() {
+  formWarning.hidden = true;
+  formWarning.textContent = "";
+}
+
+function showFormWarning(message) {
+  formWarning.hidden = false;
+  formWarning.textContent = message;
+}
+
 function readFormPayload() {
   const data = new FormData(form);
 
@@ -32,6 +68,70 @@ function readFormPayload() {
     locationHints: splitList(String(data.get("locationHints") || "")),
     photoHints: splitList(String(data.get("photoHints") || ""))
   };
+}
+
+function stripDemoArtifacts(payload) {
+  const cleaned = {
+    ...payload,
+    handles: [...payload.handles],
+    bioKeywords: [...payload.bioKeywords],
+    locationHints: [...payload.locationHints],
+    photoHints: [...payload.photoHints]
+  };
+
+  const removed = [];
+  const demoHandles = splitList(demoQuery.handles);
+  const demoKeywords = splitList(demoQuery.bioKeywords);
+  const demoLocations = splitList(demoQuery.locationHints);
+  const demoPhotoHints = splitList(demoQuery.photoHints);
+  const usingDifferentName = normalizeValue(payload.name) && normalizeValue(payload.name) !== normalizeValue(demoQuery.name);
+
+  if (!usingDifferentName) {
+    return {
+      payload: cleaned,
+      removed
+    };
+  }
+
+  if (sameList(cleaned.handles, demoHandles)) {
+    cleaned.handles = [];
+    writeField("handles", "");
+    removed.push("demo handles");
+  }
+
+  if (sameList(cleaned.bioKeywords, demoKeywords)) {
+    cleaned.bioKeywords = [];
+    writeField("bioKeywords", "");
+    removed.push("demo keywords");
+  }
+
+  if (sameList(cleaned.locationHints, demoLocations)) {
+    cleaned.locationHints = [];
+    writeField("locationHints", "");
+    removed.push("demo location");
+  }
+
+  if (
+    sameList(cleaned.photoHints, demoPhotoHints) ||
+    cleaned.photoHints.some((hint) => normalizeValue(hint).includes("assets.example.com"))
+  ) {
+    cleaned.photoHints = [];
+    writeField("photoHints", "");
+    removed.push("demo photo hint");
+  }
+
+  return {
+    payload: cleaned,
+    removed
+  };
+}
+
+function useNameOnly() {
+  const nameInput = form.querySelector('[name="name"]');
+  const currentName = String(nameInput?.value || "").trim();
+  form.reset();
+  writeField("name", currentName);
+  hideFormWarning();
 }
 
 function escapeHtml(value) {
@@ -145,7 +245,16 @@ function renderResults(payload) {
 }
 
 async function runSearch(payload) {
-  if (!hasUserClues(payload)) {
+  hideFormWarning();
+
+  const stripped = stripDemoArtifacts(payload);
+  const effectivePayload = stripped.payload;
+
+  if (stripped.removed.length > 0) {
+    showFormWarning(`Ignored ${stripped.removed.join(", ")} left over from Load Demo.`);
+  }
+
+  if (!hasUserClues(effectivePayload)) {
     resultFlags.innerHTML = "";
     results.classList.add("empty");
     results.innerHTML = "<p>Add at least a name, handle, location hint, keyword, or public photo URL.</p>";
@@ -163,7 +272,7 @@ async function runSearch(payload) {
     headers: {
       "Content-Type": "application/json"
     },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(effectivePayload)
   });
 
   if (!response.ok) {
@@ -206,10 +315,19 @@ demoButton.addEventListener("click", () => {
 
 clearButton.addEventListener("click", () => {
   form.reset();
+  hideFormWarning();
   resultFlags.innerHTML = "";
   results.classList.add("empty");
   results.innerHTML = "<p>No results yet.</p>";
   resultMeta.textContent = "Run a search to see scored matches.";
+});
+
+nameOnlyButton.addEventListener("click", () => {
+  useNameOnly();
+  resultFlags.innerHTML = "";
+  results.classList.add("empty");
+  results.innerHTML = "<p>Only the full name will be used on the next search.</p>";
+  resultMeta.textContent = "Name-only search is ready.";
 });
 
 form.addEventListener("submit", async (event) => {
