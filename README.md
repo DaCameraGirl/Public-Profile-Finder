@@ -44,7 +44,7 @@ Copy-Item .env.example .env
 Then set:
 
 ```text
-BRAVE_SEARCH_API_KEY=your_api_key_here
+SerpAPI_API_KEY=your_api_key_here
 ```
 
 With no key present, the app stays in demo mode.
