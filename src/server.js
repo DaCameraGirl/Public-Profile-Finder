@@ -69,14 +69,19 @@ const server = createServer(async (request, response) => {
       const rawBody = await readRequestBody(request);
       const query = sanitizeQuery(JSON.parse(rawBody || "{}"));
       const { source, candidates } = await loadSourceCandidates(query);
-      const results = rankCandidates(query, candidates);
+      const ranked = rankCandidates(query, candidates, {
+        sourceMode: source.mode
+      });
 
       sendJson(response, 200, {
         source,
         query,
         candidateCount: candidates.length,
-        resultCount: results.length,
-        results
+        scoredCandidateCount: ranked.meta.scoredCandidateCount,
+        hiddenCandidateCount: ranked.meta.hiddenCandidateCount,
+        resultCount: ranked.results.length,
+        filter: ranked.meta,
+        results: ranked.results
       });
       return;
     }

@@ -122,8 +122,15 @@ h2 {
 }
 
 .panel-header p {
-  margin: 0;
+  margin: 8px 0 0;
   color: var(--muted);
+}
+
+.result-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
 .grid {
@@ -270,6 +277,52 @@ button {
   font-size: 0.92rem;
 }
 
+.summary-chip,
+.tier-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 0.92rem;
+}
+
+.summary-chip {
+  background: rgba(16, 32, 52, 0.08);
+  color: var(--ink);
+}
+
+.summary-chip.live {
+  background: rgba(12, 125, 120, 0.12);
+  color: #09524e;
+}
+
+.summary-chip.demo {
+  background: rgba(209, 77, 36, 0.12);
+  color: var(--accent-dark);
+}
+
+.card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.tier-chip.high {
+  background: rgba(12, 125, 120, 0.12);
+  color: #09524e;
+}
+
+.tier-chip.strong {
+  background: rgba(16, 32, 52, 0.1);
+  color: var(--ink);
+}
+
+.tier-chip.possible {
+  background: rgba(209, 77, 36, 0.12);
+  color: var(--accent-dark);
+}
+
 a {
   color: var(--accent-dark);
 }
@@ -288,5 +341,9 @@ a {
   .result-top {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .result-flags {
+    justify-content: flex-start;
   }
 }

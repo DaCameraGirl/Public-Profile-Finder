@@ -1,6 +1,7 @@
 const form = document.querySelector("#search-form");
 const results = document.querySelector("#results");
 const resultMeta = document.querySelector("#result-meta");
+const resultFlags = document.querySelector("#result-flags");
 const demoButton = document.querySelector("#demo-button");
 const sourceStatus = document.querySelector("#source-status");
 const sourceNote = document.querySelector("#source-note");
@@ -55,17 +56,39 @@ function renderSourceState(source) {
   sourceNote.textContent = source.note || "";
 }
 
+function renderResultFlags(payload) {
+  const parts = [
+    `<span class="summary-chip ${escapeHtml(payload.source.mode)}">${escapeHtml(
+      payload.source.mode === "live" ? "Live results" : "Demo results"
+    )}</span>`,
+    `<span class="summary-chip">${escapeHtml(payload.source.label)}</span>`
+  ];
+
+  if (payload.hiddenCandidateCount > 0) {
+    parts.push(
+      `<span class="summary-chip">Hidden weak matches: ${escapeHtml(String(payload.hiddenCandidateCount))}</span>`
+    );
+  }
+
+  resultFlags.innerHTML = parts.join("");
+}
+
 function renderResults(payload) {
+  renderResultFlags(payload);
+
   if (!payload.results.length) {
     results.classList.add("empty");
-    results.innerHTML = "<p>No public candidates matched these inputs.</p>";
-    resultMeta.textContent = `0 candidates found via ${payload.source.label}.`;
+    results.innerHTML = "<p>No strong public candidates matched these inputs.</p>";
+    resultMeta.textContent =
+      payload.hiddenCandidateCount > 0
+        ? `0 visible matches via ${payload.source.label}. ${payload.hiddenCandidateCount} weak candidate${payload.hiddenCandidateCount === 1 ? "" : "s"} hidden.`
+        : `0 visible matches via ${payload.source.label}.`;
     return;
   }
 
   results.classList.remove("empty");
   resultMeta.textContent =
-    `${payload.resultCount} candidate${payload.resultCount === 1 ? "" : "s"} found via ${payload.source.label}.`;
+    `${payload.resultCount} visible candidate${payload.resultCount === 1 ? "" : "s"} from ${payload.scoredCandidateCount} scored result${payload.scoredCandidateCount === 1 ? "" : "s"} via ${payload.source.label}.`;
 
   results.innerHTML = payload.results
     .map((candidate) => {
@@ -82,6 +105,9 @@ function renderResults(payload) {
             <div>
               <h3>${escapeHtml(candidate.displayName)}</h3>
               <p class="handle">@${escapeHtml(candidate.username)} on ${escapeHtml(candidate.platform)}</p>
+              <div class="card-badges">
+                <span class="tier-chip ${escapeHtml(candidate.matchTier.key)}">${escapeHtml(candidate.matchTier.label)}</span>
+              </div>
             </div>
             <div class="score-pill">
               <strong>${candidate.score}</strong>
@@ -103,6 +129,7 @@ function renderResults(payload) {
 
 async function runSearch(payload) {
   resultMeta.textContent = "Searching public profiles...";
+  resultFlags.innerHTML = "";
   results.classList.add("empty");
   results.innerHTML = "<p>Scoring candidates...</p>";
 
@@ -149,6 +176,7 @@ form.addEventListener("submit", async (event) => {
   try {
     await runSearch(readFormPayload());
   } catch (error) {
+    resultFlags.innerHTML = "";
     results.classList.add("empty");
     results.innerHTML = `<p>${escapeHtml(error.message || "Search failed.")}</p>`;
     resultMeta.textContent = "Search failed.";

@@ -38,6 +38,46 @@ function photoFingerprint(url) {
   return segments[segments.length - 1] || normalized;
 }
 
+function compactSignals(values) {
+  return values.filter((value) => value !== null && value !== undefined && value !== false);
+}
+
+function buildMatchTier(score, signals) {
+  if (signals.exactHandle || signals.sharedPhotos.length > 0 || (signals.exactName && signals.signalCount >= 2)) {
+    return {
+      key: "high",
+      label: "High confidence"
+    };
+  }
+
+  if (score >= 40 || signals.signalCount >= 3) {
+    return {
+      key: "strong",
+      label: "Strong match"
+    };
+  }
+
+  return {
+    key: "possible",
+    label: "Possible match"
+  };
+}
+
+function passesFilter(candidate, sourceMode) {
+  const thresholds =
+    sourceMode === "live"
+      ? { minimumScore: 18, minimumSignals: 2 }
+      : { minimumScore: 12, minimumSignals: 2 };
+
+  const { signals } = candidate;
+
+  if (signals.exactHandle || signals.exactName || signals.sharedPhotos.length > 0) {
+    return true;
+  }
+
+  return candidate.score >= thresholds.minimumScore && signals.signalCount >= thresholds.minimumSignals;
+}
+
 export function sanitizeQuery(payload) {
   return {
     name: String(payload?.name || "").trim(),
@@ -51,6 +91,9 @@ export function sanitizeQuery(payload) {
 export function scoreCandidate(query, candidate) {
   const reasons = [];
   let score = 0;
+  let exactHandle = false;
+  let fuzzyHandle = false;
+  let exactName = false;
 
   const candidateHandle = normalizeText(candidate.username);
   const candidateName = normalizeText(candidate.displayName);
@@ -59,22 +102,25 @@ export function scoreCandidate(query, candidate) {
   const candidatePhotos = new Set((candidate.photoUrls || []).map(photoFingerprint));
 
   if (query.handles.includes(candidateHandle)) {
+    exactHandle = true;
     score += WEIGHTS.exactHandle;
     reasons.push(`Exact handle match on @${candidate.username}`);
   } else {
-    const fuzzyHandle = query.handles.find(
+    const fuzzyHandleMatch = query.handles.find(
       (handle) => handle && candidateHandle && (candidateHandle.includes(handle) || handle.includes(candidateHandle))
     );
 
-    if (fuzzyHandle) {
+    if (fuzzyHandleMatch) {
+      fuzzyHandle = true;
       score += WEIGHTS.fuzzyHandle;
-      reasons.push(`Handle is close to ${fuzzyHandle}`);
+      reasons.push(`Handle is close to ${fuzzyHandleMatch}`);
     }
   }
 
   if (query.name) {
     const queryName = normalizeText(query.name);
     if (queryName && queryName === candidateName) {
+      exactName = true;
       score += WEIGHTS.exactName;
       reasons.push(`Exact public display name match`);
     } else {
@@ -104,18 +150,55 @@ export function scoreCandidate(query, candidate) {
     reasons.push(`Same public photo fingerprint: ${sharedPhotos.join(", ")}`);
   }
 
+  const sharedNameTokens = exactName ? unique(tokenize(query.name)) : unique(tokenize(query.name)).filter((token) => candidateName.includes(token));
+  const signals = {
+    exactHandle,
+    fuzzyHandle,
+    exactName,
+    sharedNameTokens,
+    sharedBioTokens,
+    sharedLocationTokens,
+    sharedPhotos,
+    signalCount: compactSignals([
+      exactHandle || fuzzyHandle,
+      exactName || sharedNameTokens.length > 0,
+      sharedBioTokens.length > 0,
+      sharedLocationTokens.length > 0,
+      sharedPhotos.length > 0
+    ]).length
+  };
+  const finalScore = Math.min(score, 100);
+
   return {
     ...candidate,
-    score: Math.min(score, 100),
-    reasons
+    score: finalScore,
+    reasons,
+    signals,
+    matchTier: buildMatchTier(finalScore, signals)
   };
 }
 
-export function rankCandidates(rawQuery, candidates) {
+export function rankCandidates(rawQuery, candidates, options = {}) {
   const query = sanitizeQuery(rawQuery);
+  const sourceMode = options.sourceMode || "demo";
 
-  return candidates
+  const scoredCandidates = candidates
     .map((candidate) => scoreCandidate(query, candidate))
     .filter((candidate) => candidate.score > 0)
     .sort((left, right) => right.score - left.score || left.platform.localeCompare(right.platform));
+
+  const visibleResults = scoredCandidates.filter((candidate) => passesFilter(candidate, sourceMode));
+  const hiddenResults = scoredCandidates.filter((candidate) => !passesFilter(candidate, sourceMode));
+
+  return {
+    results: visibleResults,
+    meta: {
+      scoredCandidateCount: scoredCandidates.length,
+      hiddenCandidateCount: hiddenResults.length,
+      visibleCandidateCount: visibleResults.length,
+      sourceMode,
+      minimumSignals: sourceMode === "live" ? 2 : 2,
+      minimumScore: sourceMode === "live" ? 18 : 12
+    }
+  };
 }
