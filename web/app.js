@@ -56,6 +56,16 @@ function renderSourceState(source) {
   sourceNote.textContent = source.note || "";
 }
 
+function hasUserClues(payload) {
+  return Boolean(
+    payload.name ||
+      payload.handles.length ||
+      payload.bioKeywords.length ||
+      payload.locationHints.length ||
+      payload.photoHints.length
+  );
+}
+
 function renderResultFlags(payload) {
   const parts = [
     `<span class="summary-chip ${escapeHtml(payload.source.mode)}">${escapeHtml(
@@ -128,6 +138,14 @@ function renderResults(payload) {
 }
 
 async function runSearch(payload) {
+  if (!hasUserClues(payload)) {
+    resultFlags.innerHTML = "";
+    results.classList.add("empty");
+    results.innerHTML = "<p>Add at least a name, handle, location hint, keyword, or public photo URL.</p>";
+    resultMeta.textContent = "Search needs at least one clue.";
+    return;
+  }
+
   resultMeta.textContent = "Searching public profiles...";
   resultFlags.innerHTML = "";
   results.classList.add("empty");
@@ -142,7 +160,16 @@ async function runSearch(payload) {
   });
 
   if (!response.ok) {
-    throw new Error(`Search failed with status ${response.status}`);
+    let message = `Search failed with status ${response.status}`;
+
+    try {
+      const errorPayload = await response.json();
+      message = errorPayload.detail || errorPayload.error || message;
+    } catch {
+      // Fall back to the generic message when the response is not JSON.
+    }
+
+    throw new Error(message);
   }
 
   const result = await response.json();

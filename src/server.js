@@ -11,7 +11,7 @@ const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
 const webRoot = path.join(projectRoot, "web");
 
-loadEnvFile(projectRoot);
+loadEnvFile(projectRoot, { overrideExisting: true });
 
 const port = Number(process.env.PORT || 4173);
 
@@ -50,6 +50,8 @@ async function serveStatic(response, requestPath) {
 
 const server = createServer(async (request, response) => {
   try {
+    loadEnvFile(projectRoot, { overrideExisting: true });
+
     if (!request.url) {
       sendJson(response, 400, { error: "Missing request URL" });
       return;
@@ -68,6 +70,15 @@ const server = createServer(async (request, response) => {
     if (request.method === "POST" && url.pathname === "/api/search") {
       const rawBody = await readRequestBody(request);
       const query = sanitizeQuery(JSON.parse(rawBody || "{}"));
+
+      if (!query.name && !query.handles.length && !query.bioKeywords.length && !query.locationHints.length && !query.photoHints.length) {
+        sendJson(response, 400, {
+          error: "Enter at least one clue before searching.",
+          detail: "Add a name, handle, location hint, keyword, or public photo URL."
+        });
+        return;
+      }
+
       const { source, candidates } = await loadSourceCandidates(query);
       const ranked = rankCandidates(query, candidates, {
         sourceMode: source.mode

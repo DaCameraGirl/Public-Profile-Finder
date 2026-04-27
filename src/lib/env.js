@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
+const envFileKeys = new Set();
+
 function stripWrappingQuotes(value) {
   if (
     (value.startsWith('"') && value.endsWith('"')) ||
@@ -12,7 +14,8 @@ function stripWrappingQuotes(value) {
   return value;
 }
 
-export function loadEnvFile(projectRoot) {
+export function loadEnvFile(projectRoot, options = {}) {
+  const { overrideExisting = false } = options;
   const envPath = path.join(projectRoot, ".env");
 
   if (!existsSync(envPath)) {
@@ -37,8 +40,11 @@ export function loadEnvFile(projectRoot) {
     const key = line.slice(0, separatorIndex).trim();
     const value = stripWrappingQuotes(line.slice(separatorIndex + 1).trim());
 
-    if (key && !(key in process.env)) {
+    const canOverrideExisting = overrideExisting && (envFileKeys.has(key) || !(key in process.env));
+
+    if (key && (canOverrideExisting || !(key in process.env))) {
       process.env[key] = value;
+      envFileKeys.add(key);
     }
   }
 }

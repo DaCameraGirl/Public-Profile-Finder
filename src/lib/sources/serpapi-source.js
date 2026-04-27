@@ -4,6 +4,11 @@ const DEFAULT_COUNTRY = "us";
 const DEFAULT_LANGUAGE = "en";
 const DEFAULT_LOCATION = "United States";
 
+function isNoResultsMessage(message) {
+  const normalized = String(message || "").toLowerCase();
+  return normalized.includes("hasn't returned any results") || normalized.includes("no results");
+}
+
 function buildQuery(plan) {
   const siteFilter = SUPPORTED_PROFILE_DOMAINS.map((domain) => `site:${domain}`).join(" OR ");
   return `${plan.q} (${siteFilter})`;
@@ -34,6 +39,10 @@ async function fetchPlanResults(plan, apiKey) {
   const payload = await response.json();
 
   if (payload.error) {
+    if (isNoResultsMessage(payload.error)) {
+      return [];
+    }
+
     throw new Error(payload.error);
   }
 
@@ -59,11 +68,24 @@ export async function searchSerpApiProfiles(query, apiKey) {
   }
 
   const merged = new Map();
-  const settledResults = await Promise.all(
+  const settledResults = await Promise.allSettled(
     plans.map((plan) => fetchPlanResults(plan, apiKey).then((results) => ({ plan, results })))
   );
 
-  for (const { plan, results } of settledResults) {
+  const successfulResults = settledResults
+    .filter((result) => result.status === "fulfilled")
+    .map((result) => result.value);
+
+  if (!successfulResults.length) {
+    const firstRejectedResult = settledResults.find((result) => result.status === "rejected");
+    if (firstRejectedResult?.reason) {
+      throw firstRejectedResult.reason;
+    }
+
+    return [];
+  }
+
+  for (const { plan, results } of successfulResults) {
     const candidates = mapSearchResultsToCandidates(results, plan, (result) => ({
       title: result.title,
       url: result.link,

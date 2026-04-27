@@ -3,53 +3,56 @@ const PLATFORM_RULES = [
     platform: "Instagram",
     domains: ["instagram.com"],
     isProfilePath: (segments) =>
-      Boolean(segments[0]) && !["p", "reel", "reels", "stories", "explore", "accounts"].includes(segments[0]),
+      segments.length === 1 &&
+      Boolean(segments[0]) &&
+      !["p", "reel", "reels", "stories", "explore", "accounts"].includes(segments[0]),
     extractUsername: (segments) => segments[0]
   },
   {
     platform: "TikTok",
     domains: ["tiktok.com"],
-    isProfilePath: (segments) => Boolean(segments[0]?.startsWith("@")) && segments[1] !== "video",
+    isProfilePath: (segments) => segments.length === 1 && Boolean(segments[0]?.startsWith("@")),
     extractUsername: (segments) => segments[0]?.replace(/^@/, "")
   },
   {
     platform: "X",
     domains: ["x.com", "twitter.com"],
     isProfilePath: (segments) =>
+      segments.length === 1 &&
       Boolean(segments[0]) &&
-      !["home", "explore", "search", "i", "intent", "share", "settings", "messages", "compose"].includes(segments[0]) &&
-      segments[1] !== "status",
+      !["home", "explore", "search", "i", "intent", "share", "settings", "messages", "compose"].includes(segments[0]),
     extractUsername: (segments) => segments[0]
   },
   {
     platform: "Threads",
     domains: ["threads.net"],
-    isProfilePath: (segments) => Boolean(segments[0]?.startsWith("@")) && segments[1] !== "post",
+    isProfilePath: (segments) => segments.length === 1 && Boolean(segments[0]?.startsWith("@")),
     extractUsername: (segments) => segments[0]?.replace(/^@/, "")
   },
   {
     platform: "Pinterest",
     domains: ["pinterest.com"],
-    isProfilePath: (segments) => Boolean(segments[0]) && !["pin", "ideas", "search"].includes(segments[0]),
+    isProfilePath: (segments) => segments.length === 1 && Boolean(segments[0]) && !["pin", "ideas", "search"].includes(segments[0]),
     extractUsername: (segments) => segments[0]
   },
   {
     platform: "Poshmark",
     domains: ["poshmark.com"],
     isProfilePath: (segments) =>
-      (segments[0] === "closet" && Boolean(segments[1])) || (Boolean(segments[0]) && !["listing", "category"].includes(segments[0])),
+      (segments.length === 2 && segments[0] === "closet" && Boolean(segments[1])) ||
+      (segments.length === 1 && Boolean(segments[0]) && !["listing", "category"].includes(segments[0])),
     extractUsername: (segments) => (segments[0] === "closet" ? segments[1] : segments[0])
   },
   {
     platform: "Depop",
     domains: ["depop.com"],
-    isProfilePath: (segments) => Boolean(segments[0]) && segments[0] !== "products",
+    isProfilePath: (segments) => segments.length === 1 && Boolean(segments[0]) && segments[0] !== "products",
     extractUsername: (segments) => segments[0]
   },
   {
     platform: "Reddit",
     domains: ["reddit.com"],
-    isProfilePath: (segments) => ["user", "u"].includes(segments[0]) && Boolean(segments[1]),
+    isProfilePath: (segments) => segments.length === 2 && ["user", "u"].includes(segments[0]) && Boolean(segments[1]),
     extractUsername: (segments) => segments[1]
   }
 ];
@@ -68,6 +71,20 @@ export function cleanText(value) {
 
 function clipText(value, maxLength) {
   return value.length > maxLength ? `${value.slice(0, maxLength - 3).trim()}...` : value;
+}
+
+function normalizeHandleVariant(value) {
+  return value.replace(/[^a-z0-9]/gi, "");
+}
+
+function buildHandleQuery(handle) {
+  const variants = dedupe([
+    handle,
+    `@${handle}`,
+    normalizeHandleVariant(handle)
+  ]).filter((value) => value && value.length >= 3);
+
+  return variants.map((value) => `"${value}"`).join(" OR ");
 }
 
 function normalizeHostname(hostname) {
@@ -127,7 +144,7 @@ export function buildSearchPlans(query) {
   for (const handle of query.handles.slice(0, 4)) {
     plans.push({
       label: `Handle ${handle}`,
-      q: `"${handle}"`
+      q: buildHandleQuery(handle)
     });
   }
 
@@ -213,4 +230,14 @@ export function mapSearchResultsToCandidates(results, plan, mapper) {
   }
 
   return [...merged.values()];
+}
+
+export function hasSearchClues(query) {
+  return Boolean(
+    query.name ||
+      query.handles.length > 0 ||
+      query.bioKeywords.length > 0 ||
+      query.locationHints.length > 0 ||
+      query.photoHints.length > 0
+  );
 }
