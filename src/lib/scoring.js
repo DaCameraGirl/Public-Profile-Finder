@@ -7,6 +7,7 @@ const WEIGHTS = {
   nameToken: 8,
   bioKeyword: 5,
   locationOverlap: 12,
+  locationConflict: 14,
   photoReuse: 20
 };
 
@@ -85,7 +86,20 @@ function buildMatchTier(score, signals) {
   };
 }
 
-function passesFilter(candidate, sourceMode) {
+function hasNonNameClues(query) {
+  return Boolean(
+    query.handles.length > 0 ||
+      query.bioKeywords.length > 0 ||
+      query.locationHints.length > 0 ||
+      query.photoHints.length > 0
+  );
+}
+
+function getStateTokens(values) {
+  return values.filter((token) => token.startsWith("state:"));
+}
+
+function passesFilter(query, candidate, sourceMode) {
   const thresholds =
     sourceMode === "live"
       ? { minimumScore: 18, minimumSignals: 2 }
@@ -102,7 +116,9 @@ function passesFilter(candidate, sourceMode) {
   }
 
   if (signals.exactName) {
-    return true;
+    if (sourceMode !== "live" || !hasNonNameClues(query)) {
+      return true;
+    }
   }
 
   if (signals.nameConflict && signals.signalCount < 3) {
@@ -129,12 +145,16 @@ export function scoreCandidate(query, candidate) {
   let fuzzyHandle = false;
   let exactName = false;
   let nameConflict = false;
+  let locationConflict = false;
 
   const candidateHandle = normalizeText(candidate.username);
   const candidateName = normalizeText(candidate.displayName);
   const candidateBioTokens = new Set(tokenize(candidate.bio || candidate.publicText));
   const candidateLocationTokens = new Set(buildLocationTokens(candidate.location || candidate.publicText));
-  const candidatePhotos = new Set((candidate.photoUrls || []).map(photoFingerprint));
+  const candidatePhotos = new Set([
+    ...(candidate.photoUrls || []).map(photoFingerprint),
+    ...((candidate.matchedPhotoFingerprints || []).map(photoFingerprint))
+  ]);
 
   if (query.handles.includes(candidateHandle)) {
     exactHandle = true;
@@ -181,6 +201,15 @@ export function scoreCandidate(query, candidate) {
     reasons.push(`Public location overlap: ${formatLocationMatches(sharedLocationTokens).join(", ")}`);
   }
 
+  const queryStateTokens = getStateTokens(query.locationHints);
+  const candidateStateTokens = getStateTokens([...candidateLocationTokens]);
+  const sharedStateTokens = queryStateTokens.filter((token) => candidateLocationTokens.has(token));
+  if (queryStateTokens.length > 0 && candidateStateTokens.length > 0 && sharedStateTokens.length === 0) {
+    locationConflict = true;
+    score = Math.max(0, score - WEIGHTS.locationConflict);
+    reasons.push(`Public location points elsewhere: ${candidate.location || formatLocationMatches([...candidateLocationTokens]).join(", ")}`);
+  }
+
   const sharedPhotos = query.photoHints.filter((fingerprint) => candidatePhotos.has(fingerprint));
   if (sharedPhotos.length > 0) {
     score += WEIGHTS.photoReuse;
@@ -197,6 +226,7 @@ export function scoreCandidate(query, candidate) {
     fuzzyHandle,
     exactName,
     nameConflict,
+    locationConflict,
     sharedNameTokens,
     sharedBioTokens,
     sharedLocationTokens,
@@ -229,8 +259,8 @@ export function rankCandidates(rawQuery, candidates, options = {}) {
     .filter((candidate) => candidate.score > 0)
     .sort((left, right) => right.score - left.score || left.platform.localeCompare(right.platform));
 
-  const visibleResults = scoredCandidates.filter((candidate) => passesFilter(candidate, sourceMode));
-  const hiddenResults = scoredCandidates.filter((candidate) => !passesFilter(candidate, sourceMode));
+  const visibleResults = scoredCandidates.filter((candidate) => passesFilter(query, candidate, sourceMode));
+  const hiddenResults = scoredCandidates.filter((candidate) => !passesFilter(query, candidate, sourceMode));
   const conflictingCandidateCount = scoredCandidates.filter((candidate) => candidate.signals.nameConflict).length;
 
   return {

@@ -74,6 +74,19 @@ function unique(values) {
   return [...new Set(values.filter(Boolean))];
 }
 
+function getLastRegexCapture(text, pattern, captureIndex = 1) {
+  const matches = [...text.matchAll(pattern)];
+  if (!matches.length) {
+    return "";
+  }
+
+  const match = matches[matches.length - 1];
+  return String(match[captureIndex] || match[0] || "")
+    .replace(/\s+/g, " ")
+    .replace(/\s*[|·-]+\s*$/, "")
+    .trim();
+}
+
 function detectMentionedStates(tokens, sourceText) {
   const normalized = normalizeText(sourceText);
   const mentionedStates = [];
@@ -130,20 +143,28 @@ export function extractPublicLocation(value) {
   }
 
   const patterns = [
-    /Location:\s*([^|.]+?)(?=(?:\s+[A-Z][a-z]+:)|\s+\d+\s+connections|\s+\d+\s+followers|$)/i,
-    /\b([A-Z][A-Za-z.'-]+(?: [A-Z][A-Za-z.'-]+)*,\s*(?:[A-Z]{2}|[A-Z][a-z]+(?: [A-Z][a-z]+)*))(?:\b|$)/,
-    /\b([A-Z][A-Za-z.'-]+(?: [A-Z][A-Za-z.'-]+)*\s*,\s*USA)(?:\b|$)/,
-    /\b([A-Z][A-Za-z.'-]+(?: [A-Z][A-Za-z.'-]+)* Metropolitan Area)(?:\b|$)/
+    {
+      pattern: /Location:\s*([^|.]+?)(?=(?:\s+[A-Z][a-z]+:)|\s+\d+\s+connections|\s+\d+\s+followers|$)/gi,
+      captureIndex: 1
+    },
+    {
+      pattern: /\b([A-Z][A-Za-z'-]+(?: [A-Z][A-Za-z'-]+)*,\s*(?:[A-Z]{2}|[A-Z][a-z]+(?: [A-Z][a-z]+)*)(?:,\s*(?:United States|USA))?)\b/g,
+      captureIndex: 1
+    },
+    {
+      pattern: /\b([A-Z][A-Za-z'-]+(?: [A-Z][A-Za-z'-]+)*,\s*(?:United States|USA))\b/g,
+      captureIndex: 1
+    },
+    {
+      pattern: /\b([A-Z][A-Za-z'-]+(?: [A-Z][A-Za-z'-]+)* Metropolitan Area)\b/g,
+      captureIndex: 1
+    }
   ];
 
-  for (const pattern of patterns) {
-    const match = text.match(pattern);
-    if (match?.[1]) {
-      return match[1].replace(/\s+/g, " ").trim();
-    }
-
-    if (match?.[0]) {
-      return match[0].replace(/\s+/g, " ").trim();
+  for (const { pattern, captureIndex } of patterns) {
+    const match = getLastRegexCapture(text, pattern, captureIndex);
+    if (match) {
+      return match;
     }
   }
 

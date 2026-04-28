@@ -58,6 +58,59 @@ const PLATFORM_RULES = [
     extractUsername: (segments) => segments[1]
   },
   {
+    platform: "Facebook",
+    domains: ["facebook.com", "m.facebook.com"],
+    isProfilePath: (segments, urlValue) => {
+      if (segments.length === 1 && segments[0] === "profile.php") {
+        try {
+          return Boolean(new URL(urlValue).searchParams.get("id"));
+        } catch {
+          return false;
+        }
+      }
+
+      return (
+        segments.length === 1 &&
+        Boolean(segments[0]) &&
+        ![
+          "about",
+          "business",
+          "events",
+          "gaming",
+          "groups",
+          "help",
+          "login",
+          "marketplace",
+          "pages",
+          "photo",
+          "photos",
+          "plugins",
+          "policy",
+          "profile.php",
+          "public",
+          "reel",
+          "reels",
+          "search",
+          "settings",
+          "share",
+          "stories",
+          "watch"
+        ].includes(segments[0])
+      );
+    },
+    extractUsername: (segments, urlValue) => {
+      if (segments[0] === "profile.php") {
+        try {
+          return new URL(urlValue).searchParams.get("id") || "";
+        } catch {
+          return "";
+        }
+      }
+
+      return segments[0];
+    }
+  },
+  {
     platform: "GitHub",
     domains: ["github.com"],
     isProfilePath: (segments) =>
@@ -112,11 +165,40 @@ const PLATFORM_RULES = [
       (segments.length === 1 && Boolean(segments[0]?.startsWith("@"))) ||
       (segments.length === 2 && ["c", "channel", "user"].includes(segments[0]) && Boolean(segments[1])),
     extractUsername: (segments) => (segments[0]?.startsWith("@") ? segments[0].slice(1) : segments[1])
+  },
+  {
+    platform: "Bluesky",
+    domains: ["bsky.app"],
+    isProfilePath: (segments) => segments.length === 2 && segments[0] === "profile" && Boolean(segments[1]),
+    extractUsername: (segments) => segments[1]
+  },
+  {
+    platform: "Twitch",
+    domains: ["twitch.tv"],
+    isProfilePath: (segments) =>
+      segments.length === 1 &&
+      Boolean(segments[0]) &&
+      !["directory", "downloads", "jobs", "login", "p", "search", "settings", "store", "subscriptions"].includes(segments[0]),
+    extractUsername: (segments) => segments[0]
   }
 ];
 
 export const SUPPORTED_PROFILE_DOMAINS = PLATFORM_RULES.flatMap((rule) => rule.domains);
 const BROADER_PROFILE_DOMAINS = ["github.com", "linkedin.com", "youtube.com", "reddit.com"];
+const SOCIAL_PROFILE_DOMAINS = [
+  "facebook.com",
+  "instagram.com",
+  "threads.net",
+  "tiktok.com",
+  "twitter.com",
+  "x.com",
+  "pinterest.com",
+  "depop.com",
+  "poshmark.com",
+  "reddit.com",
+  "bsky.app",
+  "twitch.tv"
+];
 
 export function dedupe(values) {
   return [...new Set(values.filter(Boolean))];
@@ -134,6 +216,53 @@ function clipText(value, maxLength) {
 
 function normalizeHandleVariant(value) {
   return value.replace(/[^a-z0-9]/gi, "");
+}
+
+function normalizePhotoFingerprint(value) {
+  const normalized = String(value || "")
+    .toLowerCase()
+    .trim();
+
+  if (!normalized) {
+    return "";
+  }
+
+  const withoutQuery = normalized.split(/[?#]/, 1)[0];
+  const segments = withoutQuery.split("/");
+  return segments[segments.length - 1] || withoutQuery;
+}
+
+function buildPhotoSearchTerms(fingerprint) {
+  const normalized = normalizePhotoFingerprint(fingerprint);
+  if (!normalized) {
+    return [];
+  }
+
+  return [
+    {
+      label: `Photo filename ${normalized}`,
+      q: `"${normalized}"`,
+      photoFingerprints: [normalized]
+    }
+  ];
+}
+
+function buildLocationSearchTerms(locationHints) {
+  const stateTokens = new Set(
+    locationHints
+      .filter((token) => token.startsWith("state:"))
+      .map((token) => token.replace(/^state:/, ""))
+  );
+
+  return dedupe(
+    locationHints.filter((token) => {
+      if (!token || token.startsWith("state:")) {
+        return false;
+      }
+
+      return token.length > 2 || !stateTokens.has(token);
+    })
+  );
 }
 
 function buildHandleQuery(handle) {
@@ -174,8 +303,19 @@ function getUrlSegments(urlValue) {
 
 function toCanonicalProfileUrl(urlValue) {
   const url = new URL(urlValue);
+  const hostname = normalizeHostname(url.hostname);
+  const isFacebookProfileId =
+    ["facebook.com", "m.facebook.com"].includes(hostname) &&
+    url.pathname === "/profile.php" &&
+    Boolean(url.searchParams.get("id"));
+
   url.hash = "";
-  url.search = "";
+  if (isFacebookProfileId) {
+    url.search = `?id=${encodeURIComponent(url.searchParams.get("id"))}`;
+  } else {
+    url.search = "";
+  }
+
   return url.toString().replace(/\/$/, "");
 }
 
@@ -199,12 +339,22 @@ function cleanSearchTitle(title, username, platform) {
 
 export function buildSearchPlans(query) {
   const plans = [];
+  const locationTerms = buildLocationSearchTerms(query.locationHints);
 
   for (const handle of query.handles.slice(0, 4)) {
     plans.push({
       label: `Handle ${handle}`,
       q: buildHandleQuery(handle)
     });
+  }
+
+  for (const photoHint of query.photoHints.slice(0, 2)) {
+    const photoPlans = buildPhotoSearchTerms(photoHint).map((plan) => ({
+      ...plan,
+      q: clipText(query.name ? `"${query.name}" ${plan.q}` : plan.q, 220)
+    }));
+
+    plans.push(...photoPlans);
   }
 
   if (query.name) {
@@ -214,15 +364,21 @@ export function buildSearchPlans(query) {
     });
 
     plans.push({
+      label: "Name on social profiles",
+      q: clipText(`"${query.name}"`, 220),
+      domains: SOCIAL_PROFILE_DOMAINS
+    });
+
+    plans.push({
       label: "Name on broader public profiles",
       q: clipText(`"${query.name}"`, 220),
       domains: BROADER_PROFILE_DOMAINS
     });
 
-    if (query.locationHints.length > 0) {
+    if (locationTerms.length > 0) {
       plans.push({
         label: "Name and location",
-        q: clipText(`"${query.name}" ${query.locationHints.slice(0, 3).join(" ")}`, 220)
+        q: clipText(`"${query.name}" ${locationTerms.slice(0, 3).map((term) => `"${term}"`).join(" ")}`, 220)
       });
     }
 
@@ -245,7 +401,7 @@ export function buildSearchPlans(query) {
     }
   }
 
-  return dedupe(plans.map((plan) => JSON.stringify(plan))).map((plan) => JSON.parse(plan)).slice(0, 6);
+  return dedupe(plans.map((plan) => JSON.stringify(plan))).map((plan) => JSON.parse(plan)).slice(0, 8);
 }
 
 export function mapSearchResultsToCandidates(results, plan, mapper) {
@@ -263,11 +419,11 @@ export function mapSearchResultsToCandidates(results, plan, mapper) {
     }
 
     const segments = getUrlSegments(mapped.url);
-    if (!rule.isProfilePath(segments)) {
+    if (!rule.isProfilePath(segments, mapped.url)) {
       continue;
     }
 
-    const username = cleanText(rule.extractUsername(segments) || "");
+    const username = cleanText(rule.extractUsername(segments, mapped.url) || "");
     if (!username) {
       continue;
     }
@@ -284,6 +440,7 @@ export function mapSearchResultsToCandidates(results, plan, mapper) {
       bio: description,
       location: publicLocation,
       photoUrls: [],
+      matchedPhotoFingerprints: plan.photoFingerprints || [],
       publicText: cleanText([mapped.title, description].filter(Boolean).join(" ")),
       sourceLabel: mapped.sourceLabel,
       sourceQuery: plan.label,
@@ -292,18 +449,28 @@ export function mapSearchResultsToCandidates(results, plan, mapper) {
 
     const existing = merged.get(profileUrl);
     if (existing) {
-      merged.set(profileUrl, {
-        ...existing,
-        bio: candidate.bio.length > existing.bio.length ? candidate.bio : existing.bio,
-        publicText: candidate.publicText.length > existing.publicText.length ? candidate.publicText : existing.publicText,
-        sourceQueries: dedupe([...(existing.sourceQueries || []), ...candidate.sourceQueries])
-      });
+      merged.set(profileUrl, mergeProfileCandidate(existing, candidate));
     } else {
       merged.set(profileUrl, candidate);
     }
   }
 
   return [...merged.values()];
+}
+
+export function mergeProfileCandidate(existing, candidate) {
+  return {
+    ...existing,
+    displayName: candidate.displayName.length > existing.displayName.length ? candidate.displayName : existing.displayName,
+    bio: candidate.bio.length > existing.bio.length ? candidate.bio : existing.bio,
+    publicText: candidate.publicText.length > existing.publicText.length ? candidate.publicText : existing.publicText,
+    location: candidate.location.length > existing.location.length ? candidate.location : existing.location,
+    matchedPhotoFingerprints: dedupe([
+      ...(existing.matchedPhotoFingerprints || []),
+      ...(candidate.matchedPhotoFingerprints || [])
+    ]),
+    sourceQueries: dedupe([...(existing.sourceQueries || []), ...(candidate.sourceQueries || [])])
+  };
 }
 
 export function hasSearchClues(query) {

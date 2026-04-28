@@ -1,4 +1,4 @@
-import { buildSearchPlans, dedupe, mapSearchResultsToCandidates } from "./profile-search-utils.js";
+import { buildSearchPlans, mapSearchResultsToCandidates, mergeProfileCandidate } from "./profile-search-utils.js";
 
 const DEFAULT_COUNTRY = "US";
 const DEFAULT_LANGUAGE = "en";
@@ -64,12 +64,7 @@ export async function searchBraveProfiles(query, apiKey) {
     for (const candidate of candidates) {
       const existing = merged.get(candidate.profileUrl);
       if (existing) {
-        merged.set(candidate.profileUrl, {
-          ...existing,
-          bio: candidate.bio.length > existing.bio.length ? candidate.bio : existing.bio,
-          publicText: candidate.publicText.length > existing.publicText.length ? candidate.publicText : existing.publicText,
-          sourceQueries: dedupe([...(existing.sourceQueries || []), ...(candidate.sourceQueries || [])])
-        });
+        merged.set(candidate.profileUrl, mergeProfileCandidate(existing, candidate));
       } else {
         merged.set(candidate.profileUrl, candidate);
       }
