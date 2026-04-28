@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Missing Person Support Kit</title>
+    <title>Public Profile Finder</title>
     <meta
       name="description"
-      content="Build a public missing-person case page, printable flyer, and QR code using only public information you choose to share."
+      content="Public-profile review using public clues only, with free browser-side GitHub Pages mode."
     />
     <meta name="theme-color" content="#102034" />
     <link rel="manifest" href="./manifest.json" />
@@ -18,236 +18,121 @@
     <div class="backdrop"></div>
     <main class="layout">
       <section class="hero">
-        <p class="eyebrow">Static GitHub Pages App</p>
-        <h1>Missing Person Support Kit</h1>
+        <p class="eyebrow">Public Signals Only</p>
+        <h1>Public Profile Finder</h1>
         <p class="lede">
-          Build a public case page, printable flyer, share link, and QR code using only information you are
-          authorized to publish. This app is for support materials and official-contact routing, not
-          identification or surveillance.
+          Score candidate public profiles using names, handles, bio clues, public location text, and
+          reused public photo URLs. No face recognition. No private-account access.
         </p>
-        <p id="app-status" class="status-pill">Browser-only case builder</p>
+        <p id="source-status" class="status-pill">Checking source configuration...</p>
         <div class="button-row utility-row">
-          <button id="share-button" class="secondary" type="button">Share Flyer</button>
+          <button id="share-button" class="secondary" type="button">Share Link</button>
           <button id="qr-button" class="secondary" type="button">QR Code</button>
-          <button id="print-button" class="secondary" type="button">Print Flyer</button>
-          <button id="editor-button" class="secondary" type="button" hidden>Back To Editor</button>
           <button id="install-button" class="secondary" type="button" hidden>Install App</button>
         </div>
         <div id="mode-guide" class="mode-guide">
-          <strong>How sharing works:</strong> this app stores the public case details in the URL hash so a
-          GitHub Pages link can open the same flyer on another device. Do not put private notes, sensitive
-          evidence, or non-public contacts into the form.
+          <strong>Free mode:</strong> build search links, open them in Google/Bing/DuckDuckGo, then paste any
+          public profile URLs you find back into this app for local scoring.
         </div>
       </section>
 
-      <section class="panel builder-panel">
+      <section class="panel">
         <div class="panel-header">
-          <div>
-            <h2>Case Builder</h2>
-            <p>Enter public case details, official links, and the tip contacts you want on the flyer.</p>
-          </div>
+          <h2>Search Inputs</h2>
           <div class="button-row">
-            <button id="save-button" class="secondary" type="button">Save Local</button>
             <button id="clear-button" class="secondary" type="button">Clear Form</button>
+            <button id="name-only-button" class="secondary" type="button">Name Only</button>
             <button id="demo-button" class="secondary" type="button">Load Demo</button>
           </div>
         </div>
         <p id="form-warning" class="form-warning" hidden></p>
 
-        <form id="case-form" class="grid">
+        <form id="search-form" class="grid">
           <label>
-            <span>Case label</span>
-            <input name="caseLabel" placeholder="Help Locate Jordan Rivera" />
+            <span>Full name</span>
+            <input id="name" name="name" placeholder="Maya Torres" />
           </label>
 
           <label>
-            <span>Case type</span>
-            <select name="caseType">
-              <option value="adult">Missing adult</option>
-              <option value="child">Missing child</option>
-              <option value="other">Missing person</option>
-            </select>
+            <span>Known handles</span>
+            <input id="handles" name="handles" placeholder="maya.eats.bk, mayatorres" />
           </label>
 
           <label>
-            <span>Missing person's name</span>
-            <input name="name" placeholder="Jordan Rivera" />
+            <span>Bio keywords</span>
+            <input id="bioKeywords" name="bioKeywords" placeholder="supper clubs, vintage, coffee" />
           </label>
 
           <label>
-            <span>Nickname / alias</span>
-            <input name="nickname" placeholder="Jordy" />
-          </label>
-
-          <label>
-            <span>Age</span>
-            <input name="age" placeholder="29" inputmode="numeric" />
-          </label>
-
-          <label>
-            <span>Official case number</span>
-            <input name="caseNumber" placeholder="CASE-2026-0147" />
-          </label>
-
-          <label>
-            <span>Last seen date</span>
-            <input name="lastSeenDate" type="date" />
-          </label>
-
-          <label>
-            <span>Last seen location</span>
-            <input name="lastSeenLocation" placeholder="Savannah, GA" />
+            <span>Public location hints</span>
+            <input id="locationHints" name="locationHints" placeholder="Brooklyn, NY or just GA" />
+            <small class="field-note">State-only is fine here. City plus state is optional, not required.</small>
           </label>
 
           <label class="full-width">
-            <span>Public case summary</span>
-            <textarea
-              name="summary"
-              rows="4"
-              placeholder="State only public facts you are authorized to share. This text becomes part of the shareable case link."
-            ></textarea>
-            <small class="field-note">Keep it factual and public. Private notes do not belong in this app.</small>
-          </label>
-
-          <label>
-            <span>Distinguishing features</span>
-            <textarea
-              name="features"
-              rows="4"
-              placeholder="Visible details like tattoos, scars, glasses, hairstyle, or assistive devices."
-            ></textarea>
-          </label>
-
-          <label>
-            <span>Clothing / personal items</span>
-            <textarea
-              name="clothing"
-              rows="4"
-              placeholder="Last-known clothing, bag, jewelry, vehicle, or other public descriptors."
-            ></textarea>
-          </label>
-
-          <label class="full-width">
-            <span>Public photo URL</span>
+            <span>Known public profile URLs</span>
             <input
-              name="photoUrl"
-              placeholder="https://example.org/public-photo.jpg"
+              id="profileUrls"
+              name="profileUrls"
+              placeholder="https://www.linkedin.com/in/example, https://github.com/example"
             />
-            <small class="field-note">Use a public image URL that you are allowed to publish and share.</small>
+            <small class="field-note">Paste public profile page links here if you already know one.</small>
           </label>
 
           <label class="full-width">
-            <span>Official case page URL</span>
-            <input name="officialUrl" placeholder="https://agency.example.gov/cases/jordan-rivera" />
-            <small class="field-note">Link to a law-enforcement, NamUs, NCMEC, or other official public case page.</small>
-          </label>
-
-          <label>
-            <span>NamUs URL</span>
-            <input name="namusUrl" placeholder="https://namus.nij.ojp.gov/..." />
-          </label>
-
-          <label>
-            <span>NCMEC URL</span>
-            <input name="ncmecUrl" placeholder="https://www.missingkids.org/..." />
-          </label>
-
-          <label>
-            <span>Agency name</span>
-            <input name="agencyName" placeholder="Savannah Police Department" />
-          </label>
-
-          <label>
-            <span>Agency phone</span>
-            <input name="agencyPhone" placeholder="912-555-0100" />
-          </label>
-
-          <label>
-            <span>Agency email</span>
-            <input name="agencyEmail" placeholder="tips@example.gov" />
-          </label>
-
-          <label class="full-width">
-            <span>Official tip / report URL</span>
-            <input name="tipUrl" placeholder="https://agency.example.gov/report-a-tip" />
-            <small class="field-note">Tips should route to official contacts only.</small>
-          </label>
-
-          <label class="full-width">
-            <span>Public tip instructions</span>
-            <textarea
-              name="tipInstructions"
-              rows="3"
-              placeholder="Example: If you have information, contact the investigating agency or submit a tip through the official case page."
-            ></textarea>
+            <span>Known public image URLs</span>
+            <input
+              id="photoHints"
+              name="photoHints"
+              placeholder="https://assets.example.com/photos/maya-brunch-2024.jpg or .png"
+            />
+            <small class="field-note"
+              >Use direct public image files only. Profile pages like LinkedIn belong in the field above.</small
+            >
           </label>
 
           <div class="actions">
-            <button id="build-button" class="primary" type="submit">Create Flyer Page</button>
+            <button id="submit-button" class="primary" type="submit">Find Candidates</button>
           </div>
         </form>
       </section>
 
-      <section class="panel checklist-panel">
-        <div class="panel-header">
-          <div>
-            <h2>Response Checklist</h2>
-            <p>These checkboxes stay on this device only. They are not embedded in the shared case link.</p>
-          </div>
-          <span class="local-badge">Local only</span>
-        </div>
-        <div id="checklist" class="checklist"></div>
-      </section>
-
       <section class="panel notice">
-        <h2>Boundaries And Official Resources</h2>
+        <h2>Boundaries</h2>
         <p>
-          Use this app for posters, public case pages, and official-contact routing only. It does not do face
-          recognition, device tracking, private-account access, or hidden tip collection.
+          This MVP is for public-profile review only. It does not identify people by face, track live
+          location, access private accounts, or bypass platform protections.
         </p>
-        <div class="resource-links">
-          <a class="resource-link" href="https://namus.nij.ojp.gov/what-namus" target="_blank" rel="noreferrer"
-            >NamUs Overview</a
-          >
-          <a
-            class="resource-link"
-            href="https://us.missingkids.org/MissingChild"
-            target="_blank"
-            rel="noreferrer"
-            >NCMEC Missing Child Guidance</a
-          >
-        </div>
         <p id="source-note" class="notice-copy">
-          GitHub Pages can host this static app, the flyer preview, QR sharing, and the install flow for free.
-          It does not provide a secure database, paid search APIs, or a private evidence portal.
+          GitHub Pages can host the app, icon, QR sharing, and install flow for free. It does not provide
+          SerpApi credits or other paid search APIs.
         </p>
       </section>
 
-      <section class="panel preview-panel">
+      <section class="panel">
         <div class="panel-header">
           <div>
-            <h2>Case Flyer Preview</h2>
-            <p id="preview-status">Create a case or open a shared case link to preview the flyer.</p>
+            <h2>Ranked Candidates</h2>
+            <p id="result-meta">Run a search to see scored matches.</p>
           </div>
-          <div id="preview-flags" class="result-flags"></div>
+          <div id="result-flags" class="result-flags"></div>
         </div>
-        <div id="flyer-preview" class="flyer-preview empty">
-          <div class="empty-state">
-            <h3>No case loaded yet</h3>
-            <p>Use the form above to build a public flyer page with a shareable link and QR code.</p>
-          </div>
+        <div id="results" class="results empty">
+          <p>No results yet.</p>
         </div>
+        <div id="hidden-results-wrap" class="hidden-results-wrap" hidden></div>
+        <div id="manual-search-wrap" class="manual-search-wrap" hidden></div>
       </section>
     </main>
 
     <div class="qr-popup" id="qr-popup" hidden>
       <div class="qr-content">
         <button id="qr-close" class="qr-close" type="button" aria-label="Close QR popup">X</button>
-        <h2>Scan To Open The Flyer</h2>
-        <img id="qr-image" class="qr-image" alt="QR code for the case flyer link" />
+        <h2>Scan To Open On Your Phone</h2>
+        <img id="qr-image" class="qr-image" alt="QR code for Public Profile Finder" />
         <p id="qr-caption" class="qr-caption"></p>
         <div class="popup-actions">
-          <button id="qr-open-link" class="secondary popup-button" type="button">Open Flyer</button>
+          <button id="qr-open-link" class="secondary popup-button" type="button">Open App</button>
           <button id="qr-copy-link" class="secondary popup-button" type="button">Copy Link</button>
         </div>
       </div>
