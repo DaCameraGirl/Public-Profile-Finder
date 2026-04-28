@@ -1,0 +1,18 @@
+{
+  "name": "Public Profile Finder",
+  "short_name": "Profile Finder",
+  "description": "Public-profile review with browser-only GitHub Pages mode, QR sharing, and install support.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#efe6d6",
+  "theme_color": "#102034",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

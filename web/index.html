@@ -4,7 +4,15 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Public Profile Finder</title>
-    <link rel="stylesheet" href="/styles.css" />
+    <meta
+      name="description"
+      content="Public-profile review using public clues only, with free browser-side GitHub Pages mode."
+    />
+    <meta name="theme-color" content="#102034" />
+    <link rel="manifest" href="./manifest.json" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icon.svg" />
+    <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <div class="backdrop"></div>
@@ -17,6 +25,11 @@
           reused public photo URLs. No face recognition. No private-account access.
         </p>
         <p id="source-status" class="status-pill">Checking source configuration...</p>
+        <div class="button-row utility-row">
+          <button id="share-button" class="secondary" type="button">Share Link</button>
+          <button id="qr-button" class="secondary" type="button">QR Code</button>
+          <button id="install-button" class="secondary" type="button" hidden>Install App</button>
+        </div>
       </section>
 
       <section class="panel">
@@ -69,7 +82,9 @@
               name="photoHints"
               placeholder="https://assets.example.com/photos/maya-brunch-2024.jpg or .png"
             />
-            <small class="field-note">Use direct public image files only. Profile pages like LinkedIn belong in the field above.</small>
+            <small class="field-note"
+              >Use direct public image files only. Profile pages like LinkedIn belong in the field above.</small
+            >
           </label>
 
           <div class="actions">
@@ -85,7 +100,8 @@
           location, access private accounts, or bypass platform protections.
         </p>
         <p id="source-note" class="notice-copy">
-          Live search can be enabled later with a SerpApi or Brave API key in `.env`.
+          GitHub Pages can host the app, icon, QR sharing, and install flow for free. It does not provide
+          SerpApi credits or other paid search APIs.
         </p>
       </section>
 
@@ -101,9 +117,19 @@
           <p>No results yet.</p>
         </div>
         <div id="hidden-results-wrap" class="hidden-results-wrap" hidden></div>
+        <div id="manual-search-wrap" class="manual-search-wrap" hidden></div>
       </section>
     </main>
 
-    <script type="module" src="/app.js"></script>
+    <div class="qr-popup" id="qr-popup" hidden>
+      <div class="qr-content">
+        <button id="qr-close" class="qr-close" type="button" aria-label="Close QR popup">×</button>
+        <h2>Scan To Open On Your Phone</h2>
+        <img id="qr-image" class="qr-image" alt="QR code for Public Profile Finder" />
+        <p id="qr-caption" class="qr-caption"></p>
+      </div>
+    </div>
+
+    <script type="module" src="./app.js"></script>
   </body>
 </html>

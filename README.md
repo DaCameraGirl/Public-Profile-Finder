@@ -17,6 +17,13 @@ The app now has two source modes:
 - demo mode using bundled mock profiles
 - live mode using SerpApi or Brave Search over public web results on supported profile domains
 
+It also has a browser-only fallback mode for GitHub Pages:
+
+- free static hosting with no backend required
+- QR/share/install flow for phone use
+- local scoring for pasted known public profile URLs
+- prepared manual search links when no paid API-backed live search is available
+
 It scores public candidates with these signals:
 
 - display name similarity
@@ -34,6 +41,24 @@ npm start
 ```
 
 Then open `http://localhost:4173`.
+
+## GitHub Pages Mode
+
+If you publish the repo through GitHub Pages, open the site root and it will redirect into `web/`.
+
+What works there:
+
+- QR sharing
+- install prompt when the browser supports it
+- manual search-link generation
+- local scoring of pasted supported public profile URLs
+- bundled demo dataset
+
+What does not magically become free:
+
+- SerpApi credits
+- other paid search APIs
+- server-side live search without a backend
 
 ## Live Source Setup
 

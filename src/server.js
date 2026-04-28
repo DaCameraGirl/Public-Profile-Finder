@@ -20,7 +20,8 @@ const contentTypes = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
-  ".json": "application/json; charset=utf-8"
+  ".json": "application/json; charset=utf-8",
+  ".svg": "image/svg+xml"
 };
 
 function sendJson(response, statusCode, payload) {
@@ -99,13 +100,34 @@ async function readRequestBody(request) {
 
 async function serveStatic(response, requestPath) {
   const normalizedPath = requestPath === "/" ? "/index.html" : requestPath;
-  const filePath = path.join(webRoot, normalizedPath);
-  const extension = path.extname(filePath).toLowerCase();
-  const contentType = contentTypes[extension] || "application/octet-stream";
-  const fileContents = await readFile(filePath);
+  const candidateRoots = [webRoot, projectRoot];
 
-  response.writeHead(200, { "Content-Type": contentType });
-  response.end(fileContents);
+  for (const root of candidateRoots) {
+    const filePath = path.resolve(root, `.${normalizedPath}`);
+    if (!filePath.startsWith(root)) {
+      continue;
+    }
+
+    try {
+      const extension = path.extname(filePath).toLowerCase();
+      const contentType = contentTypes[extension] || "application/octet-stream";
+      const fileContents = await readFile(filePath);
+
+      response.writeHead(200, { "Content-Type": contentType });
+      response.end(fileContents);
+      return;
+    } catch (error) {
+      if (error?.code === "ENOENT") {
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  const notFoundError = new Error("File not found");
+  notFoundError.code = "ENOENT";
+  throw notFoundError;
 }
 
 const server = createServer(async (request, response) => {

@@ -1,6 +1,15 @@
+import { mockProfiles } from "../src/lib/mock-data.js";
+import { rankCandidates, sanitizeQuery } from "../src/lib/scoring.js";
+import {
+  buildSearchPlans,
+  mergeProfileCandidate,
+  parseKnownProfileUrl
+} from "../src/lib/sources/profile-search-utils.js";
+
 const form = document.querySelector("#search-form");
 const results = document.querySelector("#results");
 const hiddenResultsWrap = document.querySelector("#hidden-results-wrap");
+const manualSearchWrap = document.querySelector("#manual-search-wrap");
 const resultMeta = document.querySelector("#result-meta");
 const resultFlags = document.querySelector("#result-flags");
 const demoButton = document.querySelector("#demo-button");
@@ -9,6 +18,14 @@ const nameOnlyButton = document.querySelector("#name-only-button");
 const formWarning = document.querySelector("#form-warning");
 const sourceStatus = document.querySelector("#source-status");
 const sourceNote = document.querySelector("#source-note");
+const shareButton = document.querySelector("#share-button");
+const qrButton = document.querySelector("#qr-button");
+const installButton = document.querySelector("#install-button");
+const qrPopup = document.querySelector("#qr-popup");
+const qrClose = document.querySelector("#qr-close");
+const qrImage = document.querySelector("#qr-image");
+const qrCaption = document.querySelector("#qr-caption");
+
 const DIRECT_IMAGE_URL_PATTERN = /\.(?:apng|avif|gif|jpe?g|png|webp)$/i;
 const PUBLIC_RECORD_PLATFORMS = new Set(["CorporationWiki"]);
 const PROFILE_PAGE_DOMAINS = [
@@ -39,6 +56,9 @@ const PROFILE_PAGE_DOMAINS = [
   "goodreads.com",
   "corporationwiki.com"
 ];
+const API_HEALTH_URL = new URL("../api/health", window.location.href);
+const API_SEARCH_URL = new URL("../api/search", window.location.href);
+const QR_SERVICE_URL = "https://api.qrserver.com/v1/create-qr-code/";
 
 const demoQuery = {
   name: "Maya Torres",
@@ -48,6 +68,33 @@ const demoQuery = {
   profileUrls: "",
   photoHints: "https://assets.example.com/uploads/maya-brunch-2024.jpg"
 };
+
+const runtime = {
+  backendAvailable: false,
+  deferredPrompt: null,
+  demoPrefillActive: false
+};
+
+function getStaticSourceStatus(useDemoDataset = false) {
+  if (useDemoDataset) {
+    return {
+      id: "browser-demo",
+      label: "Bundled demo dataset",
+      mode: "demo",
+      configured: false,
+      note: "Running entirely in the browser with the bundled demo dataset and local scoring."
+    };
+  }
+
+  return {
+    id: "browser-only",
+    label: "Browser-only tools",
+    mode: "static",
+    configured: false,
+    note:
+      "Running without a backend. Paste known public profile URLs to score them locally, or use the prepared manual search links below."
+  };
+}
 
 function splitList(value) {
   return value
@@ -287,6 +334,7 @@ function stripDemoArtifacts(payload) {
 function useNameOnly() {
   const nameInput = form.querySelector('[name="name"]');
   const currentName = String(nameInput?.value || "").trim();
+  runtime.demoPrefillActive = false;
   form.reset();
   writeField("name", currentName);
   hideFormWarning();
@@ -308,10 +356,14 @@ function renderSourceState(source) {
     return;
   }
 
-  sourceStatus.textContent =
-    source.mode === "live"
-      ? `Live source: ${source.label}`
-      : `Demo mode: ${source.label}`;
+  if (source.mode === "live") {
+    sourceStatus.textContent = `Live source: ${source.label}`;
+  } else if (source.mode === "demo") {
+    sourceStatus.textContent = `Demo mode: ${source.label}`;
+  } else {
+    sourceStatus.textContent = `Browser mode: ${source.label}`;
+  }
+
   sourceNote.textContent = source.note || "";
 }
 
@@ -326,13 +378,28 @@ function hasUserClues(payload) {
   );
 }
 
+function getModeLabel(mode) {
+  if (mode === "live") {
+    return "Live results";
+  }
+
+  if (mode === "demo") {
+    return "Demo results";
+  }
+
+  return "Browser-only mode";
+}
+
 function renderResultFlags(payload) {
+  const modeClass = payload.source.mode === "live" ? "live" : payload.source.mode === "demo" ? "demo" : "static";
   const parts = [
-    `<span class="summary-chip ${escapeHtml(payload.source.mode)}">${escapeHtml(
-      payload.source.mode === "live" ? "Live results" : "Demo results"
-    )}</span>`,
+    `<span class="summary-chip ${escapeHtml(modeClass)}">${escapeHtml(getModeLabel(payload.source.mode))}</span>`,
     `<span class="summary-chip">${escapeHtml(payload.source.label)}</span>`
   ];
+
+  if (payload.manualPlans?.length) {
+    parts.push(`<span class="summary-chip">Prepared searches: ${escapeHtml(String(payload.manualPlans.length))}</span>`);
+  }
 
   if (payload.hiddenCandidateCount > 0) {
     parts.push(
@@ -440,26 +507,101 @@ function renderResultSection(title, subtitle, candidates, options = {}) {
   `;
 }
 
+function buildSearchEngineQuery(plan) {
+  const domainClause =
+    plan.domains && plan.domains.length
+      ? `(${plan.domains.slice(0, 4).map((domain) => `site:${domain}`).join(" OR ")})`
+      : "";
+
+  return [plan.q, domainClause].filter(Boolean).join(" ").trim();
+}
+
+function buildSearchEngineUrl(baseUrl, query) {
+  return `${baseUrl}${encodeURIComponent(query)}`;
+}
+
+function renderManualSearch(plans, sourceMode) {
+  if (!plans?.length) {
+    manualSearchWrap.hidden = true;
+    manualSearchWrap.innerHTML = "";
+    return;
+  }
+
+  const note =
+    sourceMode === "static"
+      ? "GitHub Pages does not give you free paid-search API credits. These links open regular web searches using your clues."
+      : "These extra search links can help you review public web results manually.";
+
+  manualSearchWrap.hidden = false;
+  manualSearchWrap.innerHTML = `
+    <section class="manual-search-panel">
+      <div class="result-section-header">
+        <div>
+          <h3>Manual Search Links</h3>
+          <p>${escapeHtml(note)}</p>
+        </div>
+        <span class="section-count">${escapeHtml(String(plans.length))}</span>
+      </div>
+      <div class="manual-search-grid">
+        ${plans
+          .map((plan) => {
+            const query = buildSearchEngineQuery(plan);
+            const googleUrl = buildSearchEngineUrl("https://www.google.com/search?q=", query);
+            const bingUrl = buildSearchEngineUrl("https://www.bing.com/search?q=", query);
+            const duckUrl = buildSearchEngineUrl("https://duckduckgo.com/?q=", query);
+            const domainChips = (plan.domains || [])
+              .map((domain) => `<span class="domain-chip">${escapeHtml(domain)}</span>`)
+              .join("");
+
+            return `
+              <article class="manual-search-card">
+                <div class="manual-search-top">
+                  <div>
+                    <h4>${escapeHtml(plan.label)}</h4>
+                    <p class="manual-query">${escapeHtml(query)}</p>
+                  </div>
+                </div>
+                <div class="manual-domain-list">${domainChips}</div>
+                <div class="manual-link-row">
+                  <a class="manual-link" href="${escapeHtml(googleUrl)}" target="_blank" rel="noreferrer">Google</a>
+                  <a class="manual-link" href="${escapeHtml(bingUrl)}" target="_blank" rel="noreferrer">Bing</a>
+                  <a class="manual-link" href="${escapeHtml(duckUrl)}" target="_blank" rel="noreferrer">DuckDuckGo</a>
+                </div>
+              </article>
+            `;
+          })
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
 function renderResults(payload) {
   renderResultFlags(payload);
   hiddenResultsWrap.hidden = true;
   hiddenResultsWrap.innerHTML = "";
+  renderManualSearch(payload.manualPlans || [], payload.source.mode);
 
   if (!payload.results.length) {
     results.classList.add("empty");
-    results.innerHTML = "<p>No strong public candidates matched these inputs.</p>";
-    resultMeta.textContent =
-      payload.hiddenCandidateCount > 0
-        ? `0 visible matches via ${payload.source.label}. ${payload.hiddenCandidateCount} weak candidate${payload.hiddenCandidateCount === 1 ? "" : "s"} hidden.`
-        : `0 visible matches via ${payload.source.label}.`;
+    results.innerHTML = "<p>No strong local candidates matched these inputs yet.</p>";
+
+    if (payload.manualPlans?.length) {
+      resultMeta.textContent = `0 local matches. ${payload.manualPlans.length} manual search link${payload.manualPlans.length === 1 ? "" : "s"} ready.`;
+    } else {
+      resultMeta.textContent =
+        payload.hiddenCandidateCount > 0
+          ? `0 visible matches. ${payload.hiddenCandidateCount} weak candidate${payload.hiddenCandidateCount === 1 ? "" : "s"} hidden.`
+          : "0 visible matches.";
+    }
+
     return;
   }
 
   results.classList.remove("empty");
   const visibleGroups = groupCandidatesByCategory(payload.results);
   const hiddenGroups = groupCandidatesByCategory(payload.hiddenResults || []);
-  resultMeta.textContent =
-    `${pluralize("visible candidate", payload.resultCount)} from ${pluralize("scored result", payload.scoredCandidateCount)} via ${payload.source.label}. ${pluralize("public profile", visibleGroups.profiles.length)} and ${pluralize("public record", visibleGroups.records.length)}.`;
+  resultMeta.textContent = `${pluralize("visible candidate", payload.resultCount)} from ${pluralize("scored result", payload.scoredCandidateCount)} via ${payload.source.label}. ${pluralize("public profile", visibleGroups.profiles.length)} and ${pluralize("public record", visibleGroups.records.length)}.`;
 
   results.innerHTML = [
     renderResultSection(
@@ -486,19 +628,118 @@ function renderResults(payload) {
               "Weak Public Profiles",
               "Low-signal profile pages that did not make the main list.",
               hiddenGroups.profiles,
-              { toneClass: " weak-card", badgeLabel: "Weak match" }
+              { toneClass: "weak-card", badgeLabel: "Weak match" }
             ),
             renderResultSection(
               "Weak Public Records",
               "Record-style hits that scored too weakly for the main list.",
               hiddenGroups.records,
-              { toneClass: " weak-card", badgeLabel: "Weak match" }
+              { toneClass: "weak-card", badgeLabel: "Weak match" }
             )
           ].join("")}
         </div>
       </details>
     `;
   }
+}
+
+function prettifyUsername(value) {
+  return String(value || "")
+    .replace(/[._-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function buildSeedCandidate(hint) {
+  return {
+    id: `${hint.platform.toLowerCase()}-${hint.username.toLowerCase()}`,
+    platform: hint.platform,
+    profileUrl: hint.profileUrl,
+    displayName: prettifyUsername(hint.username) || hint.username,
+    username: hint.username,
+    bio: "Known public profile URL provided as a clue.",
+    location: "",
+    photoUrls: [],
+    matchedPhotoFingerprints: [],
+    publicText: `${hint.platform} ${hint.username} ${hint.profileUrl}`,
+    sourceLabel: "Known profile URL",
+    sourceQuery: "Known profile URL",
+    sourceQueries: ["Known profile URL"]
+  };
+}
+
+function mergeCandidates(candidates) {
+  const merged = new Map();
+
+  for (const candidate of candidates) {
+    const existing = merged.get(candidate.profileUrl);
+    if (existing) {
+      merged.set(candidate.profileUrl, mergeProfileCandidate(existing, candidate));
+    } else {
+      merged.set(candidate.profileUrl, candidate);
+    }
+  }
+
+  return [...merged.values()];
+}
+
+function buildStaticPayload(payload) {
+  const recognizedProfileHints = payload.profileUrls
+    .map((profileUrl) => parseKnownProfileUrl(profileUrl))
+    .filter(Boolean);
+  const useDemoDataset = runtime.demoPrefillActive;
+  const query = sanitizeQuery({
+    ...payload,
+    handles: [...payload.handles, ...recognizedProfileHints.map((hint) => hint.username)],
+    profileUrls: payload.profileUrls
+  });
+  const seededCandidates = recognizedProfileHints.map((hint) => buildSeedCandidate(hint));
+  const combinedCandidates = mergeCandidates([...seededCandidates, ...(useDemoDataset ? mockProfiles : [])]);
+  const ranked = rankCandidates(query, combinedCandidates, {
+    sourceMode: useDemoDataset ? "demo" : "static"
+  });
+  const manualPlans = buildSearchPlans(query);
+
+  return {
+    source: getStaticSourceStatus(useDemoDataset),
+    query,
+    recognizedProfileHints,
+    candidateCount: combinedCandidates.length,
+    scoredCandidateCount: ranked.meta.scoredCandidateCount,
+    hiddenCandidateCount: ranked.meta.hiddenCandidateCount,
+    conflictingCandidateCount: ranked.meta.conflictingCandidateCount,
+    resultCount: ranked.results.length,
+    filter: ranked.meta,
+    results: ranked.results,
+    hiddenResults: ranked.hiddenResults,
+    manualPlans
+  };
+}
+
+async function searchWithApi(payload) {
+  const response = await fetch(API_SEARCH_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    let message = `Search failed with status ${response.status}`;
+
+    try {
+      const errorPayload = await response.json();
+      message = errorPayload.detail || errorPayload.error || message;
+    } catch {
+      // Keep the generic message.
+    }
+
+    throw new Error(message);
+  }
+
+  return response.json();
 }
 
 async function runSearch(payload) {
@@ -533,52 +774,124 @@ async function runSearch(payload) {
         : "<p>Add at least a name, handle, location hint, keyword, public profile URL, or public photo URL.</p>";
     hiddenResultsWrap.hidden = true;
     hiddenResultsWrap.innerHTML = "";
+    manualSearchWrap.hidden = true;
+    manualSearchWrap.innerHTML = "";
     resultMeta.textContent = warnings.length > 0 ? "Search needs a usable clue." : "Search needs at least one clue.";
     return;
   }
 
-  resultMeta.textContent = "Searching public profiles...";
+  resultMeta.textContent = runtime.backendAvailable ? "Searching public profiles..." : "Building browser-side results...";
   resultFlags.innerHTML = "";
   results.classList.add("empty");
-  results.innerHTML = "<p>Scoring candidates...</p>";
+  results.innerHTML = runtime.backendAvailable ? "<p>Scoring candidates...</p>" : "<p>Preparing search links and local scoring...</p>";
   hiddenResultsWrap.hidden = true;
   hiddenResultsWrap.innerHTML = "";
+  manualSearchWrap.hidden = true;
+  manualSearchWrap.innerHTML = "";
 
-  const response = await fetch("/api/search", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(effectivePayload)
-  });
-
-  if (!response.ok) {
-    let message = `Search failed with status ${response.status}`;
-
-    try {
-      const errorPayload = await response.json();
-      message = errorPayload.detail || errorPayload.error || message;
-    } catch {
-      // Fall back to the generic message when the response is not JSON.
-    }
-
-    throw new Error(message);
-  }
-
-  const result = await response.json();
+  const result = runtime.backendAvailable ? await searchWithApi(effectivePayload) : buildStaticPayload(effectivePayload);
   renderSourceState(result.source);
   renderResults(result);
 }
 
-async function loadHealth() {
-  const response = await fetch("/api/health");
+async function initializeSourceState() {
+  try {
+    const response = await fetch(API_HEALTH_URL);
 
-  if (!response.ok) {
-    throw new Error(`Health check failed with status ${response.status}`);
+    if (!response.ok) {
+      throw new Error(`Health check failed with status ${response.status}`);
+    }
+
+    const payload = await response.json();
+    runtime.backendAvailable = true;
+    renderSourceState(payload.source);
+  } catch {
+    runtime.backendAvailable = false;
+    renderSourceState(getStaticSourceStatus(false));
+  }
+}
+
+function buildAppUrl() {
+  return new URL("./", window.location.href).href;
+}
+
+function buildQrUrl() {
+  return `${QR_SERVICE_URL}?size=320x320&data=${encodeURIComponent(buildAppUrl())}&color=102034&bgcolor=f7f0e2&format=svg`;
+}
+
+function openQrPopup() {
+  qrImage.src = buildQrUrl();
+  qrImage.onerror = () => {
+    qrImage.onerror = null;
+    qrImage.src = `${QR_SERVICE_URL}?size=320x320&data=${encodeURIComponent(buildAppUrl())}`;
+  };
+  qrCaption.textContent = buildAppUrl();
+  qrPopup.hidden = false;
+}
+
+function closeQrPopup() {
+  qrPopup.hidden = true;
+}
+
+async function shareAppLink() {
+  const url = buildAppUrl();
+
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: "Public Profile Finder",
+        text: "Open Public Profile Finder",
+        url
+      });
+      return;
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        return;
+      }
+    }
   }
 
-  const payload = await response.json();
-  renderSourceState(payload.source);
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(url);
+    showFormWarning("App link copied to the clipboard.");
+    return;
+  }
+
+  window.prompt("Copy this link", url);
+}
+
+function setupInstallPrompt() {
+  window.addEventListener("beforeinstallprompt", (event) => {
+    event.preventDefault();
+    runtime.deferredPrompt = event;
+    installButton.hidden = false;
+  });
+
+  window.addEventListener("appinstalled", () => {
+    runtime.deferredPrompt = null;
+    installButton.hidden = true;
+    showFormWarning("App installed.");
+  });
+
+  installButton.addEventListener("click", async () => {
+    if (!runtime.deferredPrompt) {
+      return;
+    }
+
+    runtime.deferredPrompt.prompt();
+    await runtime.deferredPrompt.userChoice;
+    runtime.deferredPrompt = null;
+    installButton.hidden = true;
+  });
+
+  if ("serviceWorker" in navigator) {
+    const serviceWorkerUrl = new URL("../sw.js", window.location.href);
+    const serviceWorkerScope = new URL("../", window.location.href).pathname;
+
+    navigator.serviceWorker.register(serviceWorkerUrl.href, { scope: serviceWorkerScope }).catch(() => {
+      // Ignore registration failures in environments that do not support this flow.
+    });
+  }
 }
 
 demoButton.addEventListener("click", () => {
@@ -588,9 +901,14 @@ demoButton.addEventListener("click", () => {
       input.value = value;
     }
   });
+
+  runtime.demoPrefillActive = true;
+  hideFormWarning();
+  resultMeta.textContent = "Demo inputs loaded.";
 });
 
 clearButton.addEventListener("click", () => {
+  runtime.demoPrefillActive = false;
   form.reset();
   hideFormWarning();
   resultFlags.innerHTML = "";
@@ -598,6 +916,8 @@ clearButton.addEventListener("click", () => {
   results.innerHTML = "<p>No results yet.</p>";
   hiddenResultsWrap.hidden = true;
   hiddenResultsWrap.innerHTML = "";
+  manualSearchWrap.hidden = true;
+  manualSearchWrap.innerHTML = "";
   resultMeta.textContent = "Run a search to see scored matches.";
 });
 
@@ -608,7 +928,13 @@ nameOnlyButton.addEventListener("click", () => {
   results.innerHTML = "<p>Only the full name will be used on the next search.</p>";
   hiddenResultsWrap.hidden = true;
   hiddenResultsWrap.innerHTML = "";
+  manualSearchWrap.hidden = true;
+  manualSearchWrap.innerHTML = "";
   resultMeta.textContent = "Name-only search is ready.";
+});
+
+form.addEventListener("input", () => {
+  runtime.demoPrefillActive = false;
 });
 
 form.addEventListener("submit", async (event) => {
@@ -622,11 +948,25 @@ form.addEventListener("submit", async (event) => {
     results.innerHTML = `<p>${escapeHtml(error.message || "Search failed.")}</p>`;
     hiddenResultsWrap.hidden = true;
     hiddenResultsWrap.innerHTML = "";
+    manualSearchWrap.hidden = true;
+    manualSearchWrap.innerHTML = "";
     resultMeta.textContent = "Search failed.";
   }
 });
 
-loadHealth().catch((error) => {
-  sourceStatus.textContent = "Source check failed.";
-  sourceNote.textContent = escapeHtml(error.message || "Unable to load source status.");
+shareButton.addEventListener("click", () => {
+  shareAppLink().catch(() => {
+    showFormWarning("Unable to share the app link from this browser.");
+  });
 });
+
+qrButton.addEventListener("click", openQrPopup);
+qrClose.addEventListener("click", closeQrPopup);
+qrPopup.addEventListener("click", (event) => {
+  if (event.target === qrPopup) {
+    closeQrPopup();
+  }
+});
+
+setupInstallPrompt();
+initializeSourceState();
