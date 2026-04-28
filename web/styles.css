@@ -52,6 +52,21 @@ body {
   margin-top: 16px;
 }
 
+.mode-guide {
+  margin-top: 16px;
+  max-width: 720px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(16, 32, 52, 0.08);
+  color: var(--ink);
+  line-height: 1.55;
+}
+
+.mode-guide strong {
+  color: var(--accent-dark);
+}
+
 .eyebrow {
   margin: 0 0 12px;
   color: var(--accent-dark);
@@ -462,6 +477,12 @@ a {
   margin-top: 14px;
 }
 
+.manual-search-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
 .manual-search-card {
   padding: 18px;
   border-radius: 20px;
@@ -572,6 +593,18 @@ a {
   margin: 14px 0 0;
   color: var(--muted);
   word-break: break-word;
+}
+
+.popup-actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.popup-button {
+  min-width: 120px;
 }
 
 @media (max-width: 720px) {

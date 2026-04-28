@@ -99,7 +99,12 @@ async function readRequestBody(request) {
 }
 
 async function serveStatic(response, requestPath) {
-  const normalizedPath = requestPath === "/" ? "/index.html" : requestPath;
+  const normalizedPath =
+    requestPath === "/"
+      ? "/index.html"
+      : requestPath.endsWith("/")
+        ? `${requestPath}index.html`
+        : requestPath;
   const candidateRoots = [webRoot, projectRoot];
 
   for (const root of candidateRoots) {

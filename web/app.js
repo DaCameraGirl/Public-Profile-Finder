@@ -25,6 +25,10 @@ const qrPopup = document.querySelector("#qr-popup");
 const qrClose = document.querySelector("#qr-close");
 const qrImage = document.querySelector("#qr-image");
 const qrCaption = document.querySelector("#qr-caption");
+const qrOpenLinkButton = document.querySelector("#qr-open-link");
+const qrCopyLinkButton = document.querySelector("#qr-copy-link");
+const submitButton = document.querySelector("#submit-button");
+const modeGuide = document.querySelector("#mode-guide");
 
 const DIRECT_IMAGE_URL_PATTERN = /\.(?:apng|avif|gif|jpe?g|png|webp)$/i;
 const PUBLIC_RECORD_PLATFORMS = new Set(["CorporationWiki"]);
@@ -58,7 +62,13 @@ const PROFILE_PAGE_DOMAINS = [
 ];
 const API_HEALTH_URL = new URL("../api/health", window.location.href);
 const API_SEARCH_URL = new URL("../api/search", window.location.href);
-const QR_SERVICE_URL = "https://api.qrserver.com/v1/create-qr-code/";
+const DEPLOYED_APP_URL = "https://dacameragirl.github.io/Public-Profile-Finder/web/";
+const QR_PROVIDER_URLS = [
+  (text) =>
+    `https://quickchart.io/qr?size=320&margin=2&dark=102034&light=f7f0e2&text=${encodeURIComponent(text)}`,
+  (text) =>
+    `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(text)}&color=102034&bgcolor=f7f0e2&format=svg`
+];
 
 const demoQuery = {
   name: "Maya Torres",
@@ -94,6 +104,13 @@ function getStaticSourceStatus(useDemoDataset = false) {
     note:
       "Running without a backend. Paste known public profile URLs to score them locally, or use the prepared manual search links below."
   };
+}
+
+function isLocalRuntime() {
+  return (
+    window.location.protocol === "file:" ||
+    ["localhost", "127.0.0.1"].includes(window.location.hostname)
+  );
 }
 
 function splitList(value) {
@@ -367,6 +384,27 @@ function renderSourceState(source) {
   sourceNote.textContent = source.note || "";
 }
 
+function updatePrimaryActionLabel() {
+  submitButton.textContent = runtime.backendAvailable ? "Find Candidates" : "Build Free Search Plan";
+}
+
+function updateModeGuide() {
+  if (runtime.backendAvailable) {
+    modeGuide.innerHTML =
+      "<strong>Live mode:</strong> the backend can search and score candidates directly. You can still use the QR button to open the deployed app on your phone.";
+    return;
+  }
+
+  if (isLocalRuntime()) {
+    modeGuide.innerHTML =
+      "<strong>Free mode:</strong> build search links, open them in Google/Bing/DuckDuckGo, then paste public profile URLs back here to score them locally. QR and Share use the deployed GitHub Pages link, not localhost, so your phone can open it.";
+    return;
+  }
+
+  modeGuide.innerHTML =
+    "<strong>Free mode:</strong> build search links, open them in Google/Bing/DuckDuckGo, then paste any public profile URLs you find back into this app for local scoring.";
+}
+
 function hasUserClues(payload) {
   return Boolean(
     payload.name ||
@@ -520,6 +558,14 @@ function buildSearchEngineUrl(baseUrl, query) {
   return `${baseUrl}${encodeURIComponent(query)}`;
 }
 
+function openTopSearches(plans) {
+  for (const plan of plans) {
+    const query = buildSearchEngineQuery(plan);
+    const googleUrl = buildSearchEngineUrl("https://www.google.com/search?q=", query);
+    window.open(googleUrl, "_blank", "noopener,noreferrer");
+  }
+}
+
 function renderManualSearch(plans, sourceMode) {
   if (!plans?.length) {
     manualSearchWrap.hidden = true;
@@ -572,8 +618,18 @@ function renderManualSearch(plans, sourceMode) {
           })
           .join("")}
       </div>
+      <div class="manual-search-actions">
+        <button id="open-top-searches" class="secondary" type="button">Open Top 3 Google Searches</button>
+      </div>
     </section>
   `;
+
+  const openTopSearchesButton = manualSearchWrap.querySelector("#open-top-searches");
+  if (openTopSearchesButton) {
+    openTopSearchesButton.addEventListener("click", () => {
+      openTopSearches(plans.slice(0, 3));
+    });
+  }
 }
 
 function renderResults(payload) {
@@ -809,22 +865,44 @@ async function initializeSourceState() {
     runtime.backendAvailable = false;
     renderSourceState(getStaticSourceStatus(false));
   }
+
+  updatePrimaryActionLabel();
+  updateModeGuide();
 }
 
 function buildAppUrl() {
+  if (isLocalRuntime()) {
+    return DEPLOYED_APP_URL;
+  }
+
   return new URL("./", window.location.href).href;
 }
 
-function buildQrUrl() {
-  return `${QR_SERVICE_URL}?size=320x320&data=${encodeURIComponent(buildAppUrl())}&color=102034&bgcolor=f7f0e2&format=svg`;
+function buildQrUrls() {
+  const appUrl = buildAppUrl();
+  return QR_PROVIDER_URLS.map((provider) => provider(appUrl));
 }
 
 function openQrPopup() {
-  qrImage.src = buildQrUrl();
-  qrImage.onerror = () => {
-    qrImage.onerror = null;
-    qrImage.src = `${QR_SERVICE_URL}?size=320x320&data=${encodeURIComponent(buildAppUrl())}`;
+  const qrUrls = buildQrUrls();
+  let providerIndex = 0;
+
+  const applyQrProvider = () => {
+    qrImage.src = qrUrls[providerIndex];
   };
+
+  qrImage.onerror = () => {
+    providerIndex += 1;
+    if (providerIndex < qrUrls.length) {
+      applyQrProvider();
+      return;
+    }
+
+    qrImage.onerror = null;
+    showFormWarning("QR image service failed. Use Share Link or Copy Link instead.");
+  };
+
+  applyQrProvider();
   qrCaption.textContent = buildAppUrl();
   qrPopup.hidden = false;
 }
@@ -850,6 +928,18 @@ async function shareAppLink() {
       }
     }
   }
+
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(url);
+    showFormWarning("App link copied to the clipboard.");
+    return;
+  }
+
+  window.prompt("Copy this link", url);
+}
+
+async function copyAppLink() {
+  const url = buildAppUrl();
 
   if (navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(url);
@@ -962,6 +1052,14 @@ shareButton.addEventListener("click", () => {
 
 qrButton.addEventListener("click", openQrPopup);
 qrClose.addEventListener("click", closeQrPopup);
+qrOpenLinkButton.addEventListener("click", () => {
+  window.open(buildAppUrl(), "_blank", "noopener,noreferrer");
+});
+qrCopyLinkButton.addEventListener("click", () => {
+  copyAppLink().catch(() => {
+    showFormWarning("Unable to copy the app link from this browser.");
+  });
+});
 qrPopup.addEventListener("click", (event) => {
   if (event.target === qrPopup) {
     closeQrPopup();
