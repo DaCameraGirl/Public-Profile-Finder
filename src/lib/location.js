@@ -53,6 +53,18 @@ const US_STATES = [
 ];
 
 const STATE_BY_ABBREV = new Map(US_STATES);
+const STATE_NAME_BY_ABBREV = new Map(US_STATES.map(([abbrev, fullName]) => [abbrev.toUpperCase(), fullName]));
+
+function escapeRegex(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+const STATE_ABBREVIATION_PATTERN = US_STATES.map(([abbrev]) => escapeRegex(abbrev.toUpperCase())).join("|");
+const STATE_NAME_PATTERN = US_STATES.map(([, fullName]) => fullName.split(" ").map(escapeRegex).join("\\s+")).join("|");
+const CITY_STATE_PATTERN = new RegExp(
+  `\\b([A-Z][A-Za-z'\\-]+(?: [A-Z][A-Za-z'\\-]+)*,\\s*(?:${STATE_ABBREVIATION_PATTERN}|${STATE_NAME_PATTERN})(?:,\\s*(?:United States|USA))?)\\b`,
+  "g"
+);
 
 function normalizeText(value) {
   return String(value || "")
@@ -85,6 +97,34 @@ function getLastRegexCapture(text, pattern, captureIndex = 1) {
     .replace(/\s+/g, " ")
     .replace(/\s*[|·-]+\s*$/, "")
     .trim();
+}
+
+function normalizeExtractedLocation(value) {
+  const cleaned = String(value || "")
+    .replace(/^[^A-Za-z0-9]+/, "")
+    .replace(/\s+/g, " ")
+    .replace(/\s*[|;.:-]+\s*$/, "")
+    .trim();
+
+  if (!cleaned) {
+    return "";
+  }
+
+  const cityStateMatch = getLastRegexCapture(cleaned, CITY_STATE_PATTERN);
+  if (cityStateMatch) {
+    return cityStateMatch;
+  }
+
+  const upperAbbreviationMatch = cleaned.match(
+    new RegExp(`\\b([A-Z][A-Za-z'\\-]+(?: [A-Z][A-Za-z'\\-]+)*),\\s*(${STATE_ABBREVIATION_PATTERN})\\b`)
+  );
+  if (upperAbbreviationMatch) {
+    const [, city, stateAbbrev] = upperAbbreviationMatch;
+    const fullStateName = STATE_NAME_BY_ABBREV.get(stateAbbrev.toUpperCase());
+    return fullStateName ? `${city}, ${fullStateName}` : `${city}, ${stateAbbrev}`;
+  }
+
+  return cleaned;
 }
 
 function detectMentionedStates(tokens, sourceText) {
@@ -144,11 +184,23 @@ export function extractPublicLocation(value) {
 
   const patterns = [
     {
+      pattern: /\bLives in\s+([^;|.]+)(?=\s*[;|.]|$)/gi,
+      captureIndex: 1
+    },
+    {
+      pattern: /\bCurrent city[:\s]+([^;|.]+)(?=\s*[;|.]|$)/gi,
+      captureIndex: 1
+    },
+    {
+      pattern: /\bFrom\s+([^;|.]+)(?=\s*[;|.]|$)/gi,
+      captureIndex: 1
+    },
+    {
       pattern: /Location:\s*([^|.]+?)(?=(?:\s+[A-Z][a-z]+:)|\s+\d+\s+connections|\s+\d+\s+followers|$)/gi,
       captureIndex: 1
     },
     {
-      pattern: /\b([A-Z][A-Za-z'-]+(?: [A-Z][A-Za-z'-]+)*,\s*(?:[A-Z]{2}|[A-Z][a-z]+(?: [A-Z][a-z]+)*)(?:,\s*(?:United States|USA))?)\b/g,
+      pattern: CITY_STATE_PATTERN,
       captureIndex: 1
     },
     {
@@ -164,7 +216,7 @@ export function extractPublicLocation(value) {
   for (const { pattern, captureIndex } of patterns) {
     const match = getLastRegexCapture(text, pattern, captureIndex);
     if (match) {
-      return match;
+      return normalizeExtractedLocation(match);
     }
   }
 

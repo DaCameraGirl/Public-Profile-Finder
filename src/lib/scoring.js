@@ -28,6 +28,22 @@ const PRIVATE_PROFILE_MARKERS = [
   "private account",
   "follow to see"
 ];
+const COMMON_BIO_KEYWORD_STOP_WORDS = new Set([
+  "a",
+  "an",
+  "and",
+  "at",
+  "for",
+  "from",
+  "in",
+  "is",
+  "of",
+  "on",
+  "or",
+  "the",
+  "to",
+  "with"
+]);
 
 function normalizeText(value) {
   return String(value || "")
@@ -47,6 +63,10 @@ function tokenize(value) {
 
 function unique(values) {
   return [...new Set(values.filter(Boolean))];
+}
+
+function keepBioKeyword(token) {
+  return token.length >= 3 && !COMMON_BIO_KEYWORD_STOP_WORDS.has(token);
 }
 
 const DIRECT_IMAGE_URL_PATTERN = /\.(?:apng|avif|gif|jpe?g|png|webp)$/i;
@@ -215,7 +235,7 @@ export function sanitizeQuery(payload) {
   return {
     name: String(payload?.name || "").trim(),
     handles: unique((payload?.handles || []).map(normalizeText)),
-    bioKeywords: unique((payload?.bioKeywords || []).flatMap(tokenize)),
+    bioKeywords: unique((payload?.bioKeywords || []).flatMap(tokenize).filter(keepBioKeyword)),
     locationHints: buildLocationTokens(payload?.locationHints || []),
     photoHints: sanitizePhotoHints(payload?.photoHints || []),
     photoSourceUrls: sanitizePhotoSourceUrls(payload?.photoHints || []),
@@ -238,7 +258,7 @@ export function scoreCandidate(query, candidate) {
   const candidateProfileUrl = normalizeProfileUrl(candidate.profileUrl);
   const accessLimited = detectAccessLimitations(candidate);
   const candidateBioTokens = new Set(tokenize(candidate.bio || candidate.publicText));
-  const candidateLocationTokens = new Set(buildLocationTokens(candidate.location || candidate.publicText));
+  const candidateLocationTokens = new Set(buildLocationTokens(candidate.location || ""));
   const candidatePhotos = new Set([
     ...(candidate.photoUrls || []).map(photoFingerprint),
     ...((candidate.matchedPhotoFingerprints || []).map(photoFingerprint))

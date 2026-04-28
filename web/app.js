@@ -35,7 +35,8 @@ const PROFILE_PAGE_DOMAINS = [
   "ko-fi.com",
   "flickr.com",
   "letterboxd.com",
-  "goodreads.com"
+  "goodreads.com",
+  "corporationwiki.com"
 ];
 
 const demoQuery = {
@@ -49,7 +50,7 @@ const demoQuery = {
 
 function splitList(value) {
   return value
-    .split(",")
+    .split(/[\n,;]+/)
     .map((entry) => entry.trim())
     .filter(Boolean);
 }

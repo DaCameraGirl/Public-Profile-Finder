@@ -31,12 +31,15 @@ function sendJson(response, statusCode, payload) {
 function toList(value) {
   if (Array.isArray(value)) {
     return value
+      .flatMap((entry) => String(entry || "").split(/[\r\n,;]+/))
       .map((entry) => String(entry || "").trim())
       .filter(Boolean);
   }
 
-  const normalized = String(value || "").trim();
-  return normalized ? [normalized] : [];
+  return String(value || "")
+    .split(/[\r\n,;]+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 }
 
 function dedupeList(values) {

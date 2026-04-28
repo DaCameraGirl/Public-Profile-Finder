@@ -159,6 +159,15 @@ const PLATFORM_RULES = [
     extractUsername: (segments) => segments[1]
   },
   {
+    platform: "CorporationWiki",
+    domains: ["corporationwiki.com"],
+    isProfilePath: (segments) =>
+      segments.length === 4 &&
+      segments.every(Boolean) &&
+      /\.aspx$/i.test(segments[3]),
+    extractUsername: (segments) => segments[2]
+  },
+  {
     platform: "YouTube",
     domains: ["youtube.com"],
     isProfilePath: (segments) =>
@@ -279,7 +288,9 @@ const PLATFORM_RULES = [
 ];
 
 export const SUPPORTED_PROFILE_DOMAINS = PLATFORM_RULES.flatMap((rule) => rule.domains);
+const FACEBOOK_PROFILE_DOMAINS = ["facebook.com", "m.facebook.com"];
 const BROADER_PROFILE_DOMAINS = ["github.com", "linkedin.com", "youtube.com", "reddit.com"];
+const KEYWORD_STOP_WORDS = new Set(["a", "an", "and", "at", "for", "from", "in", "is", "of", "on", "or", "the", "to", "with"]);
 const SOCIAL_PROFILE_DOMAINS = [
   "facebook.com",
   "instagram.com",
@@ -397,6 +408,42 @@ function buildLocationSearchTerms(locationHints) {
   );
 }
 
+function buildFacebookDiscoveryPlans(name, locationTerms) {
+  const plans = [
+    {
+      label: "Name on Facebook profiles",
+      q: clipText(`"${name}" Facebook profile`, 220),
+      domains: FACEBOOK_PROFILE_DOMAINS
+    }
+  ];
+
+  for (const term of locationTerms.slice(0, 3)) {
+    plans.push({
+      label: `Name and ${term} on Facebook`,
+      q: clipText(`"${name}" "${term}" Facebook`, 220),
+      domains: FACEBOOK_PROFILE_DOMAINS
+    });
+  }
+
+  if (locationTerms.length > 1) {
+    plans.push({
+      label: "Name and location on Facebook",
+      q: clipText(`"${name}" ${locationTerms.slice(0, 3).map((term) => `"${term}"`).join(" ")} Facebook`, 220),
+      domains: FACEBOOK_PROFILE_DOMAINS
+    });
+  }
+
+  return plans;
+}
+
+function selectSearchKeywords(bioKeywords) {
+  return dedupe(
+    bioKeywords
+      .map((keyword) => keyword.trim())
+      .filter((keyword) => keyword.length >= 3 && !KEYWORD_STOP_WORDS.has(keyword))
+  );
+}
+
 function buildProfileUrlSearchPlans(profileUrls) {
   return profileUrls.slice(0, 4).flatMap((profileUrl) => {
     try {
@@ -420,12 +467,13 @@ function buildProfileUrlSearchPlans(profileUrls) {
   });
 }
 
-function buildNameDiscoveryPlans(name, locationTerms) {
+function buildNameDiscoveryPlans(name, locationTerms, bioKeywords) {
   const plans = [
     {
       label: "Name exact",
       q: clipText(`"${name}"`, 220)
     },
+    ...buildFacebookDiscoveryPlans(name, locationTerms),
     {
       label: "Name on high-signal social profiles",
       q: clipText(`"${name}" profile`, 220),
@@ -453,6 +501,19 @@ function buildNameDiscoveryPlans(name, locationTerms) {
     plans.push({
       label: "Name and location",
       q: clipText(`"${name}" ${limitedLocationTerms}`, 220)
+    });
+  }
+
+  const selectedKeywords = selectSearchKeywords(bioKeywords);
+  if (selectedKeywords.length > 0) {
+    plans.push({
+      label: "Name and keywords on Facebook",
+      q: clipText(`"${name}" ${selectedKeywords.slice(0, 4).map((keyword) => `"${keyword}"`).join(" ")} Facebook`, 220),
+      domains: FACEBOOK_PROFILE_DOMAINS
+    });
+    plans.push({
+      label: "Name and keywords",
+      q: clipText(`"${name}" ${selectedKeywords.slice(0, 4).join(" ")}`, 220)
     });
   }
 
@@ -581,14 +642,7 @@ export function buildSearchPlans(query) {
   }
 
   if (query.name) {
-    plans.push(...buildNameDiscoveryPlans(query.name, locationTerms));
-
-    if (query.bioKeywords.length > 0) {
-      plans.push({
-        label: "Name and keywords",
-        q: clipText(`"${query.name}" ${query.bioKeywords.slice(0, 4).join(" ")}`, 220)
-      });
-    }
+    plans.push(...buildNameDiscoveryPlans(query.name, locationTerms, query.bioKeywords));
   }
 
   if (!plans.length) {
@@ -602,7 +656,7 @@ export function buildSearchPlans(query) {
     }
   }
 
-  return dedupe(plans.map((plan) => JSON.stringify(plan))).map((plan) => JSON.parse(plan)).slice(0, 12);
+  return dedupe(plans.map((plan) => JSON.stringify(plan))).map((plan) => JSON.parse(plan)).slice(0, 16);
 }
 
 export function mapSearchResultsToCandidates(results, plan, mapper) {
