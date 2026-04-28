@@ -278,6 +278,17 @@ function showFormWarning(message) {
   formWarning.textContent = message;
 }
 
+function appendFormWarning(message) {
+  const currentMessage = formWarning.hidden ? "" : formWarning.textContent.trim();
+  const nextMessage = String(message || "").trim();
+
+  if (!nextMessage) {
+    return;
+  }
+
+  showFormWarning(currentMessage ? `${currentMessage} ${nextMessage}` : nextMessage);
+}
+
 function readFormPayload() {
   const data = new FormData(form);
 
@@ -871,7 +882,7 @@ async function runSearch(payload) {
       renderSourceState(getStaticSourceStatus(false));
       updatePrimaryActionLabel();
       updateModeGuide();
-      showFormWarning("Live search is exhausted right now. Switched to free browser mode instead.");
+      appendFormWarning("Live search is exhausted right now. Switched to free browser mode instead.");
       resultMeta.textContent = "Live search limit reached. Building browser-side results...";
       results.innerHTML = "<p>Preparing free search links and local scoring...</p>";
       result = buildStaticPayload(effectivePayload);
