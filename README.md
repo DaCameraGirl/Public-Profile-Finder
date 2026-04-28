@@ -47,7 +47,6 @@ Then set:
 
 ```text
 SERPAPI_API_KEY=your_api_key_here
-BRAVE_SEARCH_API_KEY=your_api_key_here
 ```
 
 `SERPAPI_API_KEY` is preferred when both are present. With no key present, the app stays in demo mode.
