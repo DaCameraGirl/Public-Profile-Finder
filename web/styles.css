@@ -252,6 +252,48 @@ button {
 
 .hidden-results-list {
   margin-top: 14px;
+  display: grid;
+  gap: 16px;
+}
+
+.result-section {
+  display: grid;
+  gap: 14px;
+}
+
+.result-section + .result-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(16, 32, 52, 0.08);
+}
+
+.result-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.result-section-header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-family: Georgia, "Palatino Linotype", serif;
+}
+
+.result-section-header p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.section-count {
+  min-width: 42px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  text-align: center;
+  background: rgba(16, 32, 52, 0.08);
+  color: var(--ink);
+  font-weight: 700;
 }
 
 .result-card {
@@ -380,6 +422,16 @@ button {
   color: var(--muted);
 }
 
+.tier-chip.profile-kind {
+  background: rgba(16, 32, 52, 0.08);
+  color: var(--ink);
+}
+
+.tier-chip.record-kind {
+  background: rgba(209, 77, 36, 0.12);
+  color: var(--accent-dark);
+}
+
 a {
   color: var(--accent-dark);
 }
@@ -395,7 +447,8 @@ a {
   }
 
   .panel-header,
-  .result-top {
+  .result-top,
+  .result-section-header {
     flex-direction: column;
     align-items: flex-start;
   }

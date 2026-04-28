@@ -10,6 +10,7 @@ const formWarning = document.querySelector("#form-warning");
 const sourceStatus = document.querySelector("#source-status");
 const sourceNote = document.querySelector("#source-note");
 const DIRECT_IMAGE_URL_PATTERN = /\.(?:apng|avif|gif|jpe?g|png|webp)$/i;
+const PUBLIC_RECORD_PLATFORMS = new Set(["CorporationWiki"]);
 const PROFILE_PAGE_DOMAINS = [
   "linkedin.com",
   "facebook.com",
@@ -348,6 +349,27 @@ function renderResultFlags(payload) {
   resultFlags.innerHTML = parts.join("");
 }
 
+function getCandidateCategory(candidate) {
+  return PUBLIC_RECORD_PLATFORMS.has(candidate.platform) ? "record" : "profile";
+}
+
+function groupCandidatesByCategory(candidates) {
+  return {
+    profiles: candidates.filter((candidate) => getCandidateCategory(candidate) === "profile"),
+    records: candidates.filter((candidate) => getCandidateCategory(candidate) === "record")
+  };
+}
+
+function pluralize(word, count) {
+  return `${count} ${word}${count === 1 ? "" : "s"}`;
+}
+
+function formatCandidateLabel(candidate) {
+  return getCandidateCategory(candidate) === "record"
+    ? `${candidate.username} on ${candidate.platform}`
+    : `@${candidate.username} on ${candidate.platform}`;
+}
+
 function renderCandidateCards(candidates, options = {}) {
   const toneClass = options.toneClass ? ` ${options.toneClass}` : "";
 
@@ -362,14 +384,19 @@ function renderCandidateCards(candidates, options = {}) {
       const extraBadge = options.badgeLabel
         ? `<span class="tier-chip weak">${escapeHtml(options.badgeLabel)}</span>`
         : "";
+      const categoryBadge =
+        getCandidateCategory(candidate) === "record"
+          ? `<span class="tier-chip record-kind">Public record</span>`
+          : `<span class="tier-chip profile-kind">Public profile</span>`;
 
       return `
         <article class="result-card${toneClass}">
           <div class="result-top">
             <div>
               <h3>${escapeHtml(candidate.displayName)}</h3>
-              <p class="handle">@${escapeHtml(candidate.username)} on ${escapeHtml(candidate.platform)}</p>
+              <p class="handle">${escapeHtml(formatCandidateLabel(candidate))}</p>
               <div class="card-badges">
+                ${categoryBadge}
                 <span class="tier-chip ${escapeHtml(candidate.matchTier.key)}">${escapeHtml(candidate.matchTier.label)}</span>
                 ${extraBadge}
               </div>
@@ -392,6 +419,27 @@ function renderCandidateCards(candidates, options = {}) {
     .join("");
 }
 
+function renderResultSection(title, subtitle, candidates, options = {}) {
+  if (!candidates.length) {
+    return "";
+  }
+
+  return `
+    <section class="result-section">
+      <div class="result-section-header">
+        <div>
+          <h3>${escapeHtml(title)}</h3>
+          <p>${escapeHtml(subtitle)}</p>
+        </div>
+        <span class="section-count">${escapeHtml(String(candidates.length))}</span>
+      </div>
+      <div class="results">
+        ${renderCandidateCards(candidates, options)}
+      </div>
+    </section>
+  `;
+}
+
 function renderResults(payload) {
   renderResultFlags(payload);
   hiddenResultsWrap.hidden = true;
@@ -408,10 +456,23 @@ function renderResults(payload) {
   }
 
   results.classList.remove("empty");
+  const visibleGroups = groupCandidatesByCategory(payload.results);
+  const hiddenGroups = groupCandidatesByCategory(payload.hiddenResults || []);
   resultMeta.textContent =
-    `${payload.resultCount} visible candidate${payload.resultCount === 1 ? "" : "s"} from ${payload.scoredCandidateCount} scored result${payload.scoredCandidateCount === 1 ? "" : "s"} via ${payload.source.label}.`;
+    `${pluralize("visible candidate", payload.resultCount)} from ${pluralize("scored result", payload.scoredCandidateCount)} via ${payload.source.label}. ${pluralize("public profile", visibleGroups.profiles.length)} and ${pluralize("public record", visibleGroups.records.length)}.`;
 
-  results.innerHTML = renderCandidateCards(payload.results);
+  results.innerHTML = [
+    renderResultSection(
+      "Public Profiles",
+      "Public-facing social, community, or professional profile pages.",
+      visibleGroups.profiles
+    ),
+    renderResultSection(
+      "Public Records",
+      "Business, corporate, or registry-style public records that may add context.",
+      visibleGroups.records
+    )
+  ].join("");
 
   if (payload.hiddenResults?.length) {
     hiddenResultsWrap.hidden = false;
@@ -419,8 +480,21 @@ function renderResults(payload) {
       <details class="hidden-results-panel">
         <summary>Show hidden weak matches (${escapeHtml(String(payload.hiddenResults.length))})</summary>
         <p class="hidden-results-note">These candidates scored too weakly for the main list, but you can still inspect them.</p>
-        <div class="results hidden-results-list">
-          ${renderCandidateCards(payload.hiddenResults, { toneClass: " weak-card", badgeLabel: "Weak match" })}
+        <div class="hidden-results-list">
+          ${[
+            renderResultSection(
+              "Weak Public Profiles",
+              "Low-signal profile pages that did not make the main list.",
+              hiddenGroups.profiles,
+              { toneClass: " weak-card", badgeLabel: "Weak match" }
+            ),
+            renderResultSection(
+              "Weak Public Records",
+              "Record-style hits that scored too weakly for the main list.",
+              hiddenGroups.records,
+              { toneClass: " weak-card", badgeLabel: "Weak match" }
+            )
+          ].join("")}
         </div>
       </details>
     `;
