@@ -24,6 +24,7 @@ const DEPLOYED_APP_URL = "https://dacameragirl.github.io/Public-Profile-Finder/w
 const STORAGE_KEY = "missing-person-support-case-v1";
 const CHECKLIST_KEY = "missing-person-support-checklist-v1";
 const SHARE_PREFIX = "#case=";
+const FLYER_VIEW_PARAM = "flyer";
 const GENERAL_NAMUS_URL = "https://namus.nij.ojp.gov/what-namus";
 const GENERAL_NCMEC_URL = "https://us.missingkids.org/MissingChild";
 const PUBLIC_URL_PATTERN = /^https?:\/\/\S+$/i;
@@ -120,6 +121,10 @@ function isLocalRuntime() {
     window.location.protocol === "file:" ||
     ["localhost", "127.0.0.1"].includes(window.location.hostname)
   );
+}
+
+function isFlyerOnlyView() {
+  return new URLSearchParams(window.location.search).get("view") === FLYER_VIEW_PARAM;
 }
 
 function escapeHtml(value) {
@@ -345,8 +350,21 @@ function saveChecklistState() {
   localStorage.setItem(CHECKLIST_KEY, JSON.stringify(state.checklist));
 }
 
-function buildBaseAppUrl() {
-  return isLocalRuntime() ? DEPLOYED_APP_URL : new URL("./", window.location.href).href;
+function syncViewMode() {
+  document.body.classList.toggle("flyer-only-view", isFlyerOnlyView());
+}
+
+function buildBaseAppUrl({ flyerOnly = false } = {}) {
+  const url = new URL(isLocalRuntime() ? DEPLOYED_APP_URL : new URL("./", window.location.href).href);
+
+  if (flyerOnly) {
+    url.searchParams.set("view", FLYER_VIEW_PARAM);
+  } else {
+    url.searchParams.delete("view");
+  }
+
+  url.hash = "";
+  return url.toString();
 }
 
 function encodeCasePayload(data) {
@@ -381,8 +399,8 @@ function decodeCasePayload(encoded) {
   }
 }
 
-function buildShareUrl(data = state.currentCase) {
-  const baseUrl = buildBaseAppUrl();
+function buildShareUrl(data = state.currentCase, { flyerOnly = Boolean(data && hasShareableCase(data)) } = {}) {
+  const baseUrl = buildBaseAppUrl({ flyerOnly });
 
   if (!data || !hasShareableCase(data)) {
     return baseUrl;
@@ -514,7 +532,7 @@ function buildPhotoMarkup(data) {
 
 function renderFlyer(data, sourceLabel) {
   state.currentCase = data;
-  appStatus.textContent = "Shareable flyer page ready";
+  appStatus.textContent = isFlyerOnlyView() ? "Flyer-only view" : "Shareable flyer page ready";
   previewStatus.textContent = `${sourceLabel}. Share only public information and route tips to official contacts.`;
   renderFlags(data, sourceLabel);
 
@@ -615,7 +633,7 @@ function renderFlyer(data, sourceLabel) {
 
 function renderEmptyPreview(message = "Use the form above to build a public flyer page with a shareable link and QR code.") {
   state.currentCase = null;
-  appStatus.textContent = "Browser-only case builder";
+  appStatus.textContent = isFlyerOnlyView() ? "Flyer-only view" : "Browser-only case builder";
   previewStatus.textContent = "Create a case or open a shared case link to preview the flyer.";
   previewFlags.innerHTML = "";
   flyerPreview.classList.add("empty");
@@ -670,7 +688,7 @@ function copyToClipboard(text, successMessage) {
 }
 
 async function shareFlyer() {
-  const url = buildShareUrl();
+  const url = buildShareUrl(state.currentCase, { flyerOnly: true });
   const title = state.currentCase?.name
     ? `Missing person flyer for ${state.currentCase.name}`
     : "Missing Person Support Kit";
@@ -695,7 +713,7 @@ function closeQrPopup() {
 }
 
 function openQrPopup() {
-  const url = buildShareUrl();
+  const url = buildShareUrl(state.currentCase, { flyerOnly: true });
   const urls = buildQrUrls(url);
   let index = 0;
 
@@ -776,7 +794,7 @@ function loadDemo() {
 }
 
 function setDefaultStatus() {
-  appStatus.textContent = "Browser-only case builder";
+  appStatus.textContent = isFlyerOnlyView() ? "Flyer-only view" : "Browser-only case builder";
   sourceNote.textContent =
     "GitHub Pages can host this static app, the flyer preview, QR sharing, and the install flow for free. It does not provide a secure database, paid search APIs, or a private evidence portal.";
 }
@@ -874,11 +892,11 @@ qrPopup.addEventListener("click", (event) => {
 });
 
 qrOpenLinkButton.addEventListener("click", () => {
-  window.open(buildShareUrl(), "_blank", "noopener,noreferrer");
+  window.open(buildShareUrl(state.currentCase, { flyerOnly: true }), "_blank", "noopener,noreferrer");
 });
 
 qrCopyLinkButton.addEventListener("click", () => {
-  copyToClipboard(buildShareUrl(), "Flyer link copied to the clipboard.").catch(() => {
+  copyToClipboard(buildShareUrl(state.currentCase, { flyerOnly: true }), "Flyer link copied to the clipboard.").catch(() => {
     showFormWarning("Unable to copy the flyer link from this browser.");
   });
 });
@@ -919,6 +937,7 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
+syncViewMode();
 setDefaultStatus();
 renderChecklist();
 hydrateFromHashOrDraft();
