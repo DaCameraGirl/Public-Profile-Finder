@@ -180,6 +180,101 @@ const PLATFORM_RULES = [
       Boolean(segments[0]) &&
       !["directory", "downloads", "jobs", "login", "p", "search", "settings", "store", "subscriptions"].includes(segments[0]),
     extractUsername: (segments) => segments[0]
+  },
+  {
+    platform: "Snapchat",
+    domains: ["snapchat.com"],
+    isProfilePath: (segments) => segments.length === 2 && segments[0] === "add" && Boolean(segments[1]),
+    extractUsername: (segments) => segments[1]
+  },
+  {
+    platform: "Linktree",
+    domains: ["linktr.ee"],
+    isProfilePath: (segments) => segments.length === 1 && Boolean(segments[0]),
+    extractUsername: (segments) => segments[0]
+  },
+  {
+    platform: "VSCO",
+    domains: ["vsco.co"],
+    isProfilePath: (segments) =>
+      segments.length === 1 &&
+      Boolean(segments[0]) &&
+      !["discover", "search", "signup", "home"].includes(segments[0]),
+    extractUsername: (segments) => segments[0]
+  },
+  {
+    platform: "SoundCloud",
+    domains: ["soundcloud.com"],
+    isProfilePath: (segments) =>
+      segments.length === 1 &&
+      Boolean(segments[0]) &&
+      !["charts", "discover", "jobs", "pages", "search", "settings", "stream", "upload", "you"].includes(segments[0]),
+    extractUsername: (segments) => segments[0]
+  },
+  {
+    platform: "Behance",
+    domains: ["behance.net"],
+    isProfilePath: (segments) =>
+      segments.length === 1 &&
+      Boolean(segments[0]) &&
+      !["assets", "blog", "galleries", "joblist", "search"].includes(segments[0]),
+    extractUsername: (segments) => segments[0]
+  },
+  {
+    platform: "Dribbble",
+    domains: ["dribbble.com"],
+    isProfilePath: (segments) =>
+      segments.length === 1 &&
+      Boolean(segments[0]) &&
+      !["attachments", "colors", "designers", "jobs", "learn", "search", "shots", "stories", "tags"].includes(segments[0]),
+    extractUsername: (segments) => segments[0]
+  },
+  {
+    platform: "Medium",
+    domains: ["medium.com"],
+    isProfilePath: (segments) =>
+      (segments.length === 1 && Boolean(segments[0]?.startsWith("@"))) ||
+      (segments.length === 2 && segments[0] === "u" && Boolean(segments[1])),
+    extractUsername: (segments) => (segments[0]?.startsWith("@") ? segments[0].slice(1) : segments[1])
+  },
+  {
+    platform: "Patreon",
+    domains: ["patreon.com"],
+    isProfilePath: (segments) =>
+      segments.length === 1 &&
+      Boolean(segments[0]) &&
+      !["c", "explore", "home", "login", "posts", "pricing"].includes(segments[0]),
+    extractUsername: (segments) => segments[0]
+  },
+  {
+    platform: "Ko-fi",
+    domains: ["ko-fi.com"],
+    isProfilePath: (segments) =>
+      segments.length === 1 &&
+      Boolean(segments[0]) &&
+      !["explore", "home", "login", "post", "s", "shop"].includes(segments[0]),
+    extractUsername: (segments) => segments[0]
+  },
+  {
+    platform: "Flickr",
+    domains: ["flickr.com"],
+    isProfilePath: (segments) => segments.length >= 2 && segments[0] === "photos" && Boolean(segments[1]),
+    extractUsername: (segments) => segments[1]
+  },
+  {
+    platform: "Letterboxd",
+    domains: ["letterboxd.com"],
+    isProfilePath: (segments) =>
+      segments.length === 1 &&
+      Boolean(segments[0]) &&
+      !["films", "lists", "reviews", "rss", "search", "service", "showdown", "tags"].includes(segments[0]),
+    extractUsername: (segments) => segments[0]
+  },
+  {
+    platform: "Goodreads",
+    domains: ["goodreads.com"],
+    isProfilePath: (segments) => segments.length >= 3 && segments[0] === "user" && segments[1] === "show" && Boolean(segments[2]),
+    extractUsername: (segments) => segments[2]
   }
 ];
 
@@ -197,7 +292,19 @@ const SOCIAL_PROFILE_DOMAINS = [
   "poshmark.com",
   "reddit.com",
   "bsky.app",
-  "twitch.tv"
+  "twitch.tv",
+  "snapchat.com",
+  "linktr.ee",
+  "vsco.co",
+  "soundcloud.com",
+  "behance.net",
+  "dribbble.com",
+  "medium.com",
+  "patreon.com",
+  "ko-fi.com",
+  "flickr.com",
+  "letterboxd.com",
+  "goodreads.com"
 ];
 
 export function dedupe(values) {

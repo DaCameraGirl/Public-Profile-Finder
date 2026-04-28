@@ -23,7 +23,19 @@ const PROFILE_PAGE_DOMAINS = [
   "pinterest.com",
   "reddit.com",
   "bsky.app",
-  "twitch.tv"
+  "twitch.tv",
+  "snapchat.com",
+  "linktr.ee",
+  "vsco.co",
+  "soundcloud.com",
+  "behance.net",
+  "dribbble.com",
+  "medium.com",
+  "patreon.com",
+  "ko-fi.com",
+  "flickr.com",
+  "letterboxd.com",
+  "goodreads.com"
 ];
 
 const demoQuery = {
