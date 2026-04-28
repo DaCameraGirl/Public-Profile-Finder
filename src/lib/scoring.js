@@ -31,6 +31,17 @@ function unique(values) {
   return [...new Set(values.filter(Boolean))];
 }
 
+const DIRECT_IMAGE_URL_PATTERN = /\.(?:apng|avif|gif|jpe?g|png|webp)$/i;
+
+function isDirectImageUrl(value) {
+  try {
+    const url = new URL(String(value || "").trim());
+    return ["http:", "https:"].includes(url.protocol) && DIRECT_IMAGE_URL_PATTERN.test(url.pathname);
+  } catch {
+    return false;
+  }
+}
+
 function photoFingerprint(url) {
   const normalized = normalizeText(url);
   if (!normalized) {
@@ -39,6 +50,10 @@ function photoFingerprint(url) {
 
   const segments = normalized.split("/");
   return segments[segments.length - 1] || normalized;
+}
+
+function sanitizePhotoHints(values) {
+  return unique((values || []).filter(isDirectImageUrl).map(photoFingerprint));
 }
 
 function compactSignals(values) {
@@ -134,7 +149,7 @@ export function sanitizeQuery(payload) {
     handles: unique((payload?.handles || []).map(normalizeText)),
     bioKeywords: unique((payload?.bioKeywords || []).flatMap(tokenize)),
     locationHints: buildLocationTokens(payload?.locationHints || []),
-    photoHints: unique((payload?.photoHints || []).map(photoFingerprint))
+    photoHints: sanitizePhotoHints(payload?.photoHints || [])
   };
 }
 

@@ -168,6 +168,12 @@ label span {
   color: var(--accent-dark);
 }
 
+.field-note {
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
 input {
   width: 100%;
   border: 1px solid rgba(16, 32, 52, 0.15);

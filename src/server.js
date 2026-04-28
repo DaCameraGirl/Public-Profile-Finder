@@ -69,12 +69,25 @@ const server = createServer(async (request, response) => {
 
     if (request.method === "POST" && url.pathname === "/api/search") {
       const rawBody = await readRequestBody(request);
-      const query = sanitizeQuery(JSON.parse(rawBody || "{}"));
+      const payload = JSON.parse(rawBody || "{}");
+      const query = sanitizeQuery(payload);
+      const rawPhotoHints = Array.isArray(payload?.photoHints)
+        ? payload.photoHints.filter(Boolean)
+        : [payload?.photoHints].filter(Boolean);
+      const hadOnlyInvalidPhotoHints =
+        rawPhotoHints.length > 0 &&
+        !query.photoHints.length &&
+        !String(payload?.name || "").trim() &&
+        !(payload?.handles || []).length &&
+        !(payload?.bioKeywords || []).length &&
+        !(payload?.locationHints || []).length;
 
       if (!query.name && !query.handles.length && !query.bioKeywords.length && !query.locationHints.length && !query.photoHints.length) {
         sendJson(response, 400, {
           error: "Enter at least one clue before searching.",
-          detail: "Add a name, handle, location hint, keyword, or public photo URL."
+          detail: hadOnlyInvalidPhotoHints
+            ? "Photo hints must be direct public image URLs ending in .jpg, .jpeg, .png, .webp, or .gif. Profile page links like LinkedIn do not work here."
+            : "Add a name, handle, location hint, keyword, or public photo URL."
         });
         return;
       }

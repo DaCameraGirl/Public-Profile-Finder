@@ -8,6 +8,22 @@ const nameOnlyButton = document.querySelector("#name-only-button");
 const formWarning = document.querySelector("#form-warning");
 const sourceStatus = document.querySelector("#source-status");
 const sourceNote = document.querySelector("#source-note");
+const DIRECT_IMAGE_URL_PATTERN = /\.(?:apng|avif|gif|jpe?g|png|webp)$/i;
+const PROFILE_PAGE_DOMAINS = [
+  "linkedin.com",
+  "facebook.com",
+  "instagram.com",
+  "x.com",
+  "twitter.com",
+  "tiktok.com",
+  "threads.net",
+  "github.com",
+  "youtube.com",
+  "pinterest.com",
+  "reddit.com",
+  "bsky.app",
+  "twitch.tv"
+];
 
 const demoQuery = {
   name: "Maya Torres",
@@ -46,6 +62,77 @@ function writeField(name, value) {
   if (input) {
     input.value = value;
   }
+}
+
+function normalizeHost(hostname) {
+  return String(hostname || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^www\./, "")
+    .replace(/^m\./, "");
+}
+
+function parseUrl(value) {
+  try {
+    return new URL(String(value || "").trim());
+  } catch {
+    return null;
+  }
+}
+
+function isDirectImageUrl(value) {
+  const url = parseUrl(value);
+  return Boolean(url && ["http:", "https:"].includes(url.protocol) && DIRECT_IMAGE_URL_PATTERN.test(url.pathname));
+}
+
+function isKnownProfilePageUrl(value) {
+  const url = parseUrl(value);
+  if (!url) {
+    return false;
+  }
+
+  return PROFILE_PAGE_DOMAINS.includes(normalizeHost(url.hostname)) && !DIRECT_IMAGE_URL_PATTERN.test(url.pathname);
+}
+
+function sanitizePhotoHints(payload) {
+  const cleaned = {
+    ...payload,
+    photoHints: []
+  };
+  const warnings = [];
+  const invalidImageHints = [];
+  const profilePageHints = [];
+
+  for (const hint of payload.photoHints) {
+    if (isDirectImageUrl(hint)) {
+      cleaned.photoHints.push(hint);
+      continue;
+    }
+
+    if (isKnownProfilePageUrl(hint)) {
+      profilePageHints.push(hint);
+      continue;
+    }
+
+    invalidImageHints.push(hint);
+  }
+
+  if (profilePageHints.length > 0) {
+    warnings.push("Ignored photo hints that were profile pages, not image files. Use a direct public image URL ending in .jpg, .jpeg, .png, .webp, or .gif.");
+  }
+
+  if (invalidImageHints.length > 0) {
+    warnings.push("Ignored photo hints that were not direct public image URLs.");
+  }
+
+  if (cleaned.photoHints.length !== payload.photoHints.length) {
+    writeField("photoHints", cleaned.photoHints.join(", "));
+  }
+
+  return {
+    payload: cleaned,
+    warnings
+  };
 }
 
 function hideFormWarning() {
@@ -248,17 +335,29 @@ async function runSearch(payload) {
   hideFormWarning();
 
   const stripped = stripDemoArtifacts(payload);
-  const effectivePayload = stripped.payload;
+  const warnings = [];
+  let effectivePayload = stripped.payload;
 
   if (stripped.removed.length > 0) {
-    showFormWarning(`Ignored ${stripped.removed.join(", ")} left over from Load Demo.`);
+    warnings.push(`Ignored ${stripped.removed.join(", ")} left over from Load Demo.`);
+  }
+
+  const sanitizedPhotos = sanitizePhotoHints(effectivePayload);
+  effectivePayload = sanitizedPhotos.payload;
+  warnings.push(...sanitizedPhotos.warnings);
+
+  if (warnings.length > 0) {
+    showFormWarning(warnings.join(" "));
   }
 
   if (!hasUserClues(effectivePayload)) {
     resultFlags.innerHTML = "";
     results.classList.add("empty");
-    results.innerHTML = "<p>Add at least a name, handle, location hint, keyword, or public photo URL.</p>";
-    resultMeta.textContent = "Search needs at least one clue.";
+    results.innerHTML =
+      warnings.length > 0
+        ? "<p>Search needs a usable clue. Direct photo hints must be public image URLs ending in .jpg, .jpeg, .png, .webp, or .gif.</p>"
+        : "<p>Add at least a name, handle, location hint, keyword, or public photo URL.</p>";
+    resultMeta.textContent = warnings.length > 0 ? "Search needs a usable clue." : "Search needs at least one clue.";
     return;
   }
 
