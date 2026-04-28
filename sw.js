@@ -1,4 +1,4 @@
-const CACHE_NAME = "public-profile-finder-static-v1";
+const CACHE_NAME = "missing-person-support-kit-v1";
 const APP_ASSETS = [
   "./",
   "./index.html",
@@ -7,11 +7,7 @@ const APP_ASSETS = [
   "./web/styles.css",
   "./web/app.js",
   "./web/manifest.json",
-  "./web/icon.svg",
-  "./src/lib/location.js",
-  "./src/lib/mock-data.js",
-  "./src/lib/scoring.js",
-  "./src/lib/sources/profile-search-utils.js"
+  "./web/icon.svg"
 ];
 
 self.addEventListener("install", (event) => {

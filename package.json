@@ -1,9 +1,9 @@
 {
-  "name": "public-profile-finder",
+  "name": "missing-person-support-kit",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Lawful public-profile finder MVP using public signals only.",
+  "description": "Static missing-person support flyer builder for GitHub Pages.",
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js"

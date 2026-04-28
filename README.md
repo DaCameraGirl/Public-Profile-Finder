@@ -1,38 +1,23 @@
-# Public Profile Finder
+# Missing Person Support Kit
 
-An app to set your mind at ease using public signals only.
-
-A lawful MVP for finding likely public-profile matches using public signals only.
+A static GitHub Pages app for building a public case page, printable flyer, and QR code using only public information you are authorized to share.
 
 This project is intentionally constrained:
 
 - No face recognition
+- No reverse-image matching
 - No private-account access
-- No logged-in scraping
-- No live or inferred device location
-- No covert monitoring
+- No device tracking
+- No hidden tip inbox
+- No secure evidence storage
 
-The app now has two source modes:
+What it does:
 
-- demo mode using bundled mock profiles
-- live mode using SerpApi or Brave Search over public web results on supported profile domains
-
-It also has a browser-only fallback mode for GitHub Pages:
-
-- free static hosting with no backend required
-- QR/share/install flow for phone use
-- local scoring for pasted known public profile URLs
-- prepared manual search links when no paid API-backed live search is available
-
-It scores public candidates with these signals:
-
-- display name similarity
-- known handle similarity
-- known public profile URLs on supported platforms
-- public bio keyword overlap
-- public location text overlap
-- reused public photo URLs or filenames
-- reverse image exact matches from direct public image URLs when SerpApi is enabled
+- build a shareable flyer page from public case details
+- generate a QR code for the flyer
+- support printing and install-to-home-screen
+- keep a local response checklist in the browser
+- route people to official case links and agency contacts
 
 ## Run
 
@@ -42,54 +27,23 @@ npm start
 
 Then open `http://localhost:4173`.
 
-## GitHub Pages Mode
+## GitHub Pages
 
-If you publish the repo through GitHub Pages, open the site root and it will redirect into `web/`.
+This app is designed to work as a static GitHub Pages site.
 
-What works there:
+- the root page redirects into `web/`
+- the flyer share link stores the public case data in the URL hash
+- QR sharing works without a backend
+- the checklist stays local to the current browser
 
-- QR sharing
-- install prompt when the browser supports it
-- manual search-link generation
-- local scoring of pasted supported public profile URLs
-- bundled demo dataset
+Because the share link contains the case data, do not enter private notes, non-public evidence, or sensitive contact information into the form.
 
-What does not magically become free:
+## Official-resource intent
 
-- SerpApi credits
-- other paid search APIs
-- server-side live search without a backend
+This repo is for public support materials only. It should be used to:
 
-## Live Source Setup
+- link to official public case pages
+- show the public investigating-agency contact
+- direct tips to official phone numbers, emails, or tip forms
 
-Create a local `.env` file from `.env.example` and add your preferred live search key:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-Then set:
-
-```text
-SERPAPI_API_KEY=your_api_key_here
-```
-
-`SERPAPI_API_KEY` is preferred when both are present. With no key present, the app stays in demo mode.
-
-## Input Tips
-
-- Put supported profile page links in `Known public profile URLs`.
-- Put only direct public image files in `Known public image URLs`.
-- Direct image search currently expects a public URL ending in `.jpg`, `.jpeg`, `.png`, `.webp`, or `.gif`.
-- Profile pages like LinkedIn or Instagram should not be pasted into the image field.
-
-## Why This Shape
-
-Step one is a runnable repo with a clear policy boundary and a scoring engine you can extend later with official APIs or compliant public-web connectors.
-
-## Next Steps
-
-1. Add result enrichment for public profile pages after discovery.
-2. Add source-specific rate limits and retry handling.
-3. Add saved searches and audit logs.
-4. Add manual review tooling before any result is treated as a match.
+For emergencies, contact local law enforcement or 911. For missing-child cases in the United States, use NCMEC guidance at `https://us.missingkids.org/MissingChild`. For broader missing-person resources, see NamUs at `https://namus.nij.ojp.gov/what-namus`.
