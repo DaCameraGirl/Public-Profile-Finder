@@ -48,7 +48,8 @@
 
           <label>
             <span>Public location hints</span>
-            <input id="locationHints" name="locationHints" placeholder="Brooklyn, NY" />
+            <input id="locationHints" name="locationHints" placeholder="Brooklyn, NY or just GA" />
+            <small class="field-note">State-only is fine here. City plus state is optional, not required.</small>
           </label>
 
           <label class="full-width">
@@ -99,6 +100,7 @@
         <div id="results" class="results empty">
           <p>No results yet.</p>
         </div>
+        <div id="hidden-results-wrap" class="hidden-results-wrap" hidden></div>
       </section>
     </main>
 

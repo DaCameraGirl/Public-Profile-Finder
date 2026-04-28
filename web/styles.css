@@ -228,11 +228,42 @@ button {
   color: var(--muted);
 }
 
+.hidden-results-wrap {
+  margin-top: 18px;
+}
+
+.hidden-results-panel {
+  border: 1px solid rgba(16, 32, 52, 0.08);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.58);
+  padding: 16px 18px;
+}
+
+.hidden-results-panel summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.hidden-results-note {
+  margin: 14px 0 0;
+  color: var(--muted);
+}
+
+.hidden-results-list {
+  margin-top: 14px;
+}
+
 .result-card {
   padding: 18px;
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid rgba(16, 32, 52, 0.08);
+}
+
+.result-card.weak-card {
+  background: rgba(255, 255, 255, 0.54);
+  border-style: dashed;
 }
 
 .result-top {
@@ -342,6 +373,11 @@ button {
 .tier-chip.possible {
   background: rgba(209, 77, 36, 0.12);
   color: var(--accent-dark);
+}
+
+.tier-chip.weak {
+  background: rgba(16, 32, 52, 0.08);
+  color: var(--muted);
 }
 
 a {

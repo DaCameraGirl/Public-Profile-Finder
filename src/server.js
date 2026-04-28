@@ -193,7 +193,8 @@ const server = createServer(async (request, response) => {
         conflictingCandidateCount: ranked.meta.conflictingCandidateCount,
         resultCount: ranked.results.length,
         filter: ranked.meta,
-        results: ranked.results
+        results: ranked.results,
+        hiddenResults: ranked.hiddenResults
       });
       return;
     }

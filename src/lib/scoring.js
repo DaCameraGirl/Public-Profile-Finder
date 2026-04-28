@@ -321,6 +321,7 @@ export function rankCandidates(rawQuery, candidates, options = {}) {
 
   return {
     results: visibleResults,
+    hiddenResults,
     meta: {
       scoredCandidateCount: scoredCandidates.length,
       hiddenCandidateCount: hiddenResults.length,

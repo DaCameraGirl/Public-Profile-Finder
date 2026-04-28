@@ -1,5 +1,6 @@
 const form = document.querySelector("#search-form");
 const results = document.querySelector("#results");
+const hiddenResultsWrap = document.querySelector("#hidden-results-wrap");
 const resultMeta = document.querySelector("#result-meta");
 const resultFlags = document.querySelector("#result-flags");
 const demoButton = document.querySelector("#demo-button");
@@ -334,24 +335,10 @@ function renderResultFlags(payload) {
   resultFlags.innerHTML = parts.join("");
 }
 
-function renderResults(payload) {
-  renderResultFlags(payload);
+function renderCandidateCards(candidates, options = {}) {
+  const toneClass = options.toneClass ? ` ${options.toneClass}` : "";
 
-  if (!payload.results.length) {
-    results.classList.add("empty");
-    results.innerHTML = "<p>No strong public candidates matched these inputs.</p>";
-    resultMeta.textContent =
-      payload.hiddenCandidateCount > 0
-        ? `0 visible matches via ${payload.source.label}. ${payload.hiddenCandidateCount} weak candidate${payload.hiddenCandidateCount === 1 ? "" : "s"} hidden.`
-        : `0 visible matches via ${payload.source.label}.`;
-    return;
-  }
-
-  results.classList.remove("empty");
-  resultMeta.textContent =
-    `${payload.resultCount} visible candidate${payload.resultCount === 1 ? "" : "s"} from ${payload.scoredCandidateCount} scored result${payload.scoredCandidateCount === 1 ? "" : "s"} via ${payload.source.label}.`;
-
-  results.innerHTML = payload.results
+  return candidates
     .map((candidate) => {
       const reasons = candidate.reasons
         .map((reason) => `<span class="reason">${escapeHtml(reason)}</span>`)
@@ -359,15 +346,19 @@ function renderResults(payload) {
       const sourceQueries = (candidate.sourceQueries || [])
         .map((query) => `<span class="source-chip">${escapeHtml(query)}</span>`)
         .join("");
+      const extraBadge = options.badgeLabel
+        ? `<span class="tier-chip weak">${escapeHtml(options.badgeLabel)}</span>`
+        : "";
 
       return `
-        <article class="result-card">
+        <article class="result-card${toneClass}">
           <div class="result-top">
             <div>
               <h3>${escapeHtml(candidate.displayName)}</h3>
               <p class="handle">@${escapeHtml(candidate.username)} on ${escapeHtml(candidate.platform)}</p>
               <div class="card-badges">
                 <span class="tier-chip ${escapeHtml(candidate.matchTier.key)}">${escapeHtml(candidate.matchTier.label)}</span>
+                ${extraBadge}
               </div>
             </div>
             <div class="score-pill">
@@ -386,6 +377,41 @@ function renderResults(payload) {
       `;
     })
     .join("");
+}
+
+function renderResults(payload) {
+  renderResultFlags(payload);
+  hiddenResultsWrap.hidden = true;
+  hiddenResultsWrap.innerHTML = "";
+
+  if (!payload.results.length) {
+    results.classList.add("empty");
+    results.innerHTML = "<p>No strong public candidates matched these inputs.</p>";
+    resultMeta.textContent =
+      payload.hiddenCandidateCount > 0
+        ? `0 visible matches via ${payload.source.label}. ${payload.hiddenCandidateCount} weak candidate${payload.hiddenCandidateCount === 1 ? "" : "s"} hidden.`
+        : `0 visible matches via ${payload.source.label}.`;
+    return;
+  }
+
+  results.classList.remove("empty");
+  resultMeta.textContent =
+    `${payload.resultCount} visible candidate${payload.resultCount === 1 ? "" : "s"} from ${payload.scoredCandidateCount} scored result${payload.scoredCandidateCount === 1 ? "" : "s"} via ${payload.source.label}.`;
+
+  results.innerHTML = renderCandidateCards(payload.results);
+
+  if (payload.hiddenResults?.length) {
+    hiddenResultsWrap.hidden = false;
+    hiddenResultsWrap.innerHTML = `
+      <details class="hidden-results-panel">
+        <summary>Show hidden weak matches (${escapeHtml(String(payload.hiddenResults.length))})</summary>
+        <p class="hidden-results-note">These candidates scored too weakly for the main list, but you can still inspect them.</p>
+        <div class="results hidden-results-list">
+          ${renderCandidateCards(payload.hiddenResults, { toneClass: " weak-card", badgeLabel: "Weak match" })}
+        </div>
+      </details>
+    `;
+  }
 }
 
 async function runSearch(payload) {
@@ -418,6 +444,8 @@ async function runSearch(payload) {
       warnings.length > 0
         ? "<p>Search needs a usable clue. Direct photo hints must be public image URLs ending in .jpg, .jpeg, .png, .webp, or .gif.</p>"
         : "<p>Add at least a name, handle, location hint, keyword, public profile URL, or public photo URL.</p>";
+    hiddenResultsWrap.hidden = true;
+    hiddenResultsWrap.innerHTML = "";
     resultMeta.textContent = warnings.length > 0 ? "Search needs a usable clue." : "Search needs at least one clue.";
     return;
   }
@@ -426,6 +454,8 @@ async function runSearch(payload) {
   resultFlags.innerHTML = "";
   results.classList.add("empty");
   results.innerHTML = "<p>Scoring candidates...</p>";
+  hiddenResultsWrap.hidden = true;
+  hiddenResultsWrap.innerHTML = "";
 
   const response = await fetch("/api/search", {
     method: "POST",
@@ -479,6 +509,8 @@ clearButton.addEventListener("click", () => {
   resultFlags.innerHTML = "";
   results.classList.add("empty");
   results.innerHTML = "<p>No results yet.</p>";
+  hiddenResultsWrap.hidden = true;
+  hiddenResultsWrap.innerHTML = "";
   resultMeta.textContent = "Run a search to see scored matches.";
 });
 
@@ -487,6 +519,8 @@ nameOnlyButton.addEventListener("click", () => {
   resultFlags.innerHTML = "";
   results.classList.add("empty");
   results.innerHTML = "<p>Only the full name will be used on the next search.</p>";
+  hiddenResultsWrap.hidden = true;
+  hiddenResultsWrap.innerHTML = "";
   resultMeta.textContent = "Name-only search is ready.";
 });
 
@@ -499,6 +533,8 @@ form.addEventListener("submit", async (event) => {
     resultFlags.innerHTML = "";
     results.classList.add("empty");
     results.innerHTML = `<p>${escapeHtml(error.message || "Search failed.")}</p>`;
+    hiddenResultsWrap.hidden = true;
+    hiddenResultsWrap.innerHTML = "";
     resultMeta.textContent = "Search failed.";
   }
 });
