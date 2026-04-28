@@ -265,6 +265,29 @@ function buildLocationSearchTerms(locationHints) {
   );
 }
 
+function buildProfileUrlSearchPlans(profileUrls) {
+  return profileUrls.slice(0, 4).flatMap((profileUrl) => {
+    try {
+      const url = new URL(profileUrl);
+      const hostname = normalizeHostname(url.hostname);
+      const path = `${url.pathname}${url.search}`.replace(/\/$/, "");
+      const searchableValue = `${hostname}${path}`;
+
+      return searchableValue
+        ? [
+            {
+              label: `Known profile URL ${hostname}`,
+              q: clipText(`"${searchableValue}"`, 220),
+              domains: [hostname]
+            }
+          ]
+        : [];
+    } catch {
+      return [];
+    }
+  });
+}
+
 function buildHandleQuery(handle) {
   const variants = dedupe([
     handle,
@@ -319,6 +342,29 @@ function toCanonicalProfileUrl(urlValue) {
   return url.toString().replace(/\/$/, "");
 }
 
+export function parseKnownProfileUrl(urlValue) {
+  const rule = getPlatformRule(urlValue);
+  if (!rule) {
+    return null;
+  }
+
+  const segments = getUrlSegments(urlValue);
+  if (!rule.isProfilePath(segments, urlValue)) {
+    return null;
+  }
+
+  const username = cleanText(rule.extractUsername(segments, urlValue) || "");
+  if (!username) {
+    return null;
+  }
+
+  return {
+    platform: rule.platform,
+    username,
+    profileUrl: toCanonicalProfileUrl(urlValue)
+  };
+}
+
 function cleanSearchTitle(title, username, platform) {
   const compactTitle = cleanText(title);
   const pieces = compactTitle
@@ -340,6 +386,7 @@ function cleanSearchTitle(title, username, platform) {
 export function buildSearchPlans(query) {
   const plans = [];
   const locationTerms = buildLocationSearchTerms(query.locationHints);
+  plans.push(...buildProfileUrlSearchPlans(query.profileUrls || []));
 
   for (const handle of query.handles.slice(0, 4)) {
     plans.push({
@@ -476,6 +523,7 @@ export function mergeProfileCandidate(existing, candidate) {
 export function hasSearchClues(query) {
   return Boolean(
     query.name ||
+      (query.profileUrls || []).length > 0 ||
       query.handles.length > 0 ||
       query.bioKeywords.length > 0 ||
       query.locationHints.length > 0 ||

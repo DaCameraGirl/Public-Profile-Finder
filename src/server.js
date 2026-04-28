@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadEnvFile } from "./lib/env.js";
 import { rankCandidates, sanitizeQuery } from "./lib/scoring.js";
+import { mergeProfileCandidate, parseKnownProfileUrl } from "./lib/sources/profile-search-utils.js";
 import { getSourceStatus, loadSourceCandidates } from "./lib/sources/search-source.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -25,6 +26,62 @@ const contentTypes = {
 function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
   response.end(JSON.stringify(payload, null, 2));
+}
+
+function toList(value) {
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => String(entry || "").trim())
+      .filter(Boolean);
+  }
+
+  const normalized = String(value || "").trim();
+  return normalized ? [normalized] : [];
+}
+
+function dedupeList(values) {
+  return [...new Set(values.filter(Boolean))];
+}
+
+function prettifyUsername(value) {
+  return String(value || "")
+    .replace(/[._-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function buildSeedCandidate(hint) {
+  return {
+    id: `${hint.platform.toLowerCase()}-${hint.username.toLowerCase()}`,
+    platform: hint.platform,
+    profileUrl: hint.profileUrl,
+    displayName: prettifyUsername(hint.username) || hint.username,
+    username: hint.username,
+    bio: "Known public profile URL provided as a clue.",
+    location: "",
+    photoUrls: [],
+    matchedPhotoFingerprints: [],
+    publicText: `${hint.platform} ${hint.username} ${hint.profileUrl}`,
+    sourceLabel: "Known profile URL",
+    sourceQuery: "Known profile URL",
+    sourceQueries: ["Known profile URL"]
+  };
+}
+
+function mergeCandidates(candidates) {
+  const merged = new Map();
+
+  for (const candidate of candidates) {
+    const existing = merged.get(candidate.profileUrl);
+    if (existing) {
+      merged.set(candidate.profileUrl, mergeProfileCandidate(existing, candidate));
+    } else {
+      merged.set(candidate.profileUrl, candidate);
+    }
+  }
+
+  return [...merged.values()];
 }
 
 async function readRequestBody(request) {
@@ -70,37 +127,67 @@ const server = createServer(async (request, response) => {
     if (request.method === "POST" && url.pathname === "/api/search") {
       const rawBody = await readRequestBody(request);
       const payload = JSON.parse(rawBody || "{}");
-      const query = sanitizeQuery(payload);
-      const rawPhotoHints = Array.isArray(payload?.photoHints)
-        ? payload.photoHints.filter(Boolean)
-        : [payload?.photoHints].filter(Boolean);
+      const rawHandles = toList(payload?.handles);
+      const rawBioKeywords = toList(payload?.bioKeywords);
+      const rawLocationHints = toList(payload?.locationHints);
+      const rawPhotoInputs = toList(payload?.photoHints);
+      const movedProfileUrls = rawPhotoInputs
+        .map((photoHint) => parseKnownProfileUrl(photoHint)?.profileUrl || "")
+        .filter(Boolean);
+      const rawPhotoHints = rawPhotoInputs.filter((photoHint) => !parseKnownProfileUrl(photoHint));
+      const rawProfileUrls = dedupeList([...toList(payload?.profileUrls), ...movedProfileUrls]);
+      const recognizedProfileHints = rawProfileUrls
+        .map((profileUrl) => parseKnownProfileUrl(profileUrl))
+        .filter(Boolean);
+      const query = sanitizeQuery({
+        ...payload,
+        handles: [...rawHandles, ...recognizedProfileHints.map((hint) => hint.username)],
+        bioKeywords: rawBioKeywords,
+        locationHints: rawLocationHints,
+        profileUrls: rawProfileUrls,
+        photoHints: rawPhotoHints
+      });
       const hadOnlyInvalidPhotoHints =
         rawPhotoHints.length > 0 &&
         !query.photoHints.length &&
         !String(payload?.name || "").trim() &&
-        !(payload?.handles || []).length &&
-        !(payload?.bioKeywords || []).length &&
-        !(payload?.locationHints || []).length;
+        rawHandles.length === 0 &&
+        rawBioKeywords.length === 0 &&
+        rawLocationHints.length === 0 &&
+        rawProfileUrls.length === 0;
+      const hadOnlyInvalidProfileUrls =
+        rawProfileUrls.length > 0 &&
+        recognizedProfileHints.length === 0 &&
+        !String(payload?.name || "").trim() &&
+        rawHandles.length === 0 &&
+        rawBioKeywords.length === 0 &&
+        rawLocationHints.length === 0 &&
+        rawPhotoHints.length === 0;
 
       if (!query.name && !query.handles.length && !query.bioKeywords.length && !query.locationHints.length && !query.photoHints.length) {
         sendJson(response, 400, {
           error: "Enter at least one clue before searching.",
           detail: hadOnlyInvalidPhotoHints
             ? "Photo hints must be direct public image URLs ending in .jpg, .jpeg, .png, .webp, or .gif. Profile page links like LinkedIn do not work here."
-            : "Add a name, handle, location hint, keyword, or public photo URL."
+            : hadOnlyInvalidProfileUrls
+              ? "Known profile URLs must be supported public profile links such as LinkedIn, GitHub, Instagram, Facebook, TikTok, X, YouTube, Reddit, Bluesky, or Twitch."
+              : "Add a name, handle, location hint, keyword, public profile URL, or public photo URL."
         });
         return;
       }
 
       const { source, candidates } = await loadSourceCandidates(query);
-      const ranked = rankCandidates(query, candidates, {
+      const seededCandidates = recognizedProfileHints.map((hint) => buildSeedCandidate(hint));
+      const combinedCandidates = mergeCandidates([...seededCandidates, ...candidates]);
+      const ranked = rankCandidates(query, combinedCandidates, {
         sourceMode: source.mode
       });
 
       sendJson(response, 200, {
         source,
         query,
-        candidateCount: candidates.length,
+        recognizedProfileHints,
+        candidateCount: combinedCandidates.length,
         scoredCandidateCount: ranked.meta.scoredCandidateCount,
         hiddenCandidateCount: ranked.meta.hiddenCandidateCount,
         conflictingCandidateCount: ranked.meta.conflictingCandidateCount,

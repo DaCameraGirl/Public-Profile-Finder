@@ -1,6 +1,7 @@
 import { buildLocationTokens } from "./location.js";
 
 const WEIGHTS = {
+  exactProfileUrl: 48,
   exactHandle: 38,
   fuzzyHandle: 18,
   exactName: 24,
@@ -56,6 +57,29 @@ function sanitizePhotoHints(values) {
   return unique((values || []).filter(isDirectImageUrl).map(photoFingerprint));
 }
 
+function sanitizePhotoSourceUrls(values) {
+  return unique((values || []).filter(isDirectImageUrl).map((value) => String(value).trim()));
+}
+
+function normalizeProfileUrl(value) {
+  try {
+    const url = new URL(String(value || "").trim());
+    const hostname = url.hostname.toLowerCase().replace(/^www\./, "").replace(/^m\./, "");
+    const isFacebookProfileId =
+      ["facebook.com"].includes(hostname) &&
+      url.pathname === "/profile.php" &&
+      Boolean(url.searchParams.get("id"));
+
+    url.protocol = "https:";
+    url.hostname = hostname;
+    url.hash = "";
+    url.search = isFacebookProfileId ? `?id=${encodeURIComponent(url.searchParams.get("id"))}` : "";
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return String(value || "").trim().toLowerCase();
+  }
+}
+
 function compactSignals(values) {
   return values.filter((value) => value !== null && value !== undefined && value !== false);
 }
@@ -81,7 +105,7 @@ function buildMatchTier(score, signals) {
     };
   }
 
-  if (signals.exactHandle || signals.sharedPhotos.length > 0 || (signals.exactName && signals.signalCount >= 2)) {
+  if (signals.exactProfileUrl || signals.exactHandle || signals.sharedPhotos.length > 0 || (signals.exactName && signals.signalCount >= 2)) {
     return {
       key: "high",
       label: "High confidence"
@@ -103,6 +127,7 @@ function buildMatchTier(score, signals) {
 
 function hasNonNameClues(query) {
   return Boolean(
+    (query.profileUrls || []).length > 0 ||
     query.handles.length > 0 ||
       query.bioKeywords.length > 0 ||
       query.locationHints.length > 0 ||
@@ -123,6 +148,10 @@ function passesFilter(query, candidate, sourceMode) {
   const { signals } = candidate;
 
   if (signals.sharedPhotos.length > 0) {
+    return true;
+  }
+
+  if (signals.exactProfileUrl) {
     return true;
   }
 
@@ -149,7 +178,9 @@ export function sanitizeQuery(payload) {
     handles: unique((payload?.handles || []).map(normalizeText)),
     bioKeywords: unique((payload?.bioKeywords || []).flatMap(tokenize)),
     locationHints: buildLocationTokens(payload?.locationHints || []),
-    photoHints: sanitizePhotoHints(payload?.photoHints || [])
+    photoHints: sanitizePhotoHints(payload?.photoHints || []),
+    photoSourceUrls: sanitizePhotoSourceUrls(payload?.photoHints || []),
+    profileUrls: unique((payload?.profileUrls || []).map(normalizeProfileUrl))
   };
 }
 
@@ -159,17 +190,25 @@ export function scoreCandidate(query, candidate) {
   let exactHandle = false;
   let fuzzyHandle = false;
   let exactName = false;
+  let exactProfileUrl = false;
   let nameConflict = false;
   let locationConflict = false;
 
   const candidateHandle = normalizeText(candidate.username);
   const candidateName = normalizeText(candidate.displayName);
+  const candidateProfileUrl = normalizeProfileUrl(candidate.profileUrl);
   const candidateBioTokens = new Set(tokenize(candidate.bio || candidate.publicText));
   const candidateLocationTokens = new Set(buildLocationTokens(candidate.location || candidate.publicText));
   const candidatePhotos = new Set([
     ...(candidate.photoUrls || []).map(photoFingerprint),
     ...((candidate.matchedPhotoFingerprints || []).map(photoFingerprint))
   ]);
+
+  if ((query.profileUrls || []).includes(candidateProfileUrl)) {
+    exactProfileUrl = true;
+    score += WEIGHTS.exactProfileUrl;
+    reasons.push("Exact public profile URL match");
+  }
 
   if (query.handles.includes(candidateHandle)) {
     exactHandle = true;
@@ -240,6 +279,7 @@ export function scoreCandidate(query, candidate) {
     exactHandle,
     fuzzyHandle,
     exactName,
+    exactProfileUrl,
     nameConflict,
     locationConflict,
     sharedNameTokens,
@@ -248,6 +288,7 @@ export function scoreCandidate(query, candidate) {
     sharedPhotos,
     signalCount: compactSignals([
       exactHandle || fuzzyHandle,
+      exactProfileUrl,
       exactName || sharedNameTokens.length > 0,
       sharedBioTokens.length > 0,
       sharedLocationTokens.length > 0,
@@ -266,7 +307,7 @@ export function scoreCandidate(query, candidate) {
 }
 
 export function rankCandidates(rawQuery, candidates, options = {}) {
-  const query = sanitizeQuery(rawQuery);
+  const query = rawQuery?.photoSourceUrls !== undefined ? rawQuery : sanitizeQuery(rawQuery);
   const sourceMode = options.sourceMode || "demo";
 
   const scoredCandidates = candidates

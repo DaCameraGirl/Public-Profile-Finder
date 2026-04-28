@@ -21,9 +21,11 @@ It scores public candidates with these signals:
 
 - display name similarity
 - known handle similarity
+- known public profile URLs on supported platforms
 - public bio keyword overlap
 - public location text overlap
 - reused public photo URLs or filenames
+- reverse image exact matches from direct public image URLs when SerpApi is enabled
 
 ## Run
 
@@ -49,6 +51,13 @@ BRAVE_SEARCH_API_KEY=your_api_key_here
 ```
 
 `SERPAPI_API_KEY` is preferred when both are present. With no key present, the app stays in demo mode.
+
+## Input Tips
+
+- Put supported profile page links in `Known public profile URLs`.
+- Put only direct public image files in `Known public image URLs`.
+- Direct image search currently expects a public URL ending in `.jpg`, `.jpeg`, `.png`, `.webp`, or `.gif`.
+- Profile pages like LinkedIn or Instagram should not be pasted into the image field.
 
 ## Why This Shape
 

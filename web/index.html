@@ -52,13 +52,23 @@
           </label>
 
           <label class="full-width">
-            <span>Known public photo URLs</span>
+            <span>Known public profile URLs</span>
+            <input
+              id="profileUrls"
+              name="profileUrls"
+              placeholder="https://www.linkedin.com/in/example, https://github.com/example"
+            />
+            <small class="field-note">Paste public profile page links here if you already know one.</small>
+          </label>
+
+          <label class="full-width">
+            <span>Known public image URLs</span>
             <input
               id="photoHints"
               name="photoHints"
               placeholder="https://assets.example.com/photos/maya-brunch-2024.jpg or .png"
             />
-            <small class="field-note">Use direct public image files only. Profile pages like LinkedIn will be ignored.</small>
+            <small class="field-note">Use direct public image files only. Profile pages like LinkedIn belong in the field above.</small>
           </label>
 
           <div class="actions">

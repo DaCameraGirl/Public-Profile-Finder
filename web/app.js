@@ -30,6 +30,7 @@ const demoQuery = {
   handles: "maya.eats.bk, mayatorres",
   bioKeywords: "supper clubs, vintage, coffee",
   locationHints: "Brooklyn, NY",
+  profileUrls: "",
   photoHints: "https://assets.example.com/uploads/maya-brunch-2024.jpg"
 };
 
@@ -55,6 +56,10 @@ function normalizeList(values) {
 
 function sameList(left, right) {
   return JSON.stringify(normalizeList(left)) === JSON.stringify(normalizeList(right));
+}
+
+function dedupeEntries(values) {
+  return [...new Set(values.map((value) => String(value || "").trim()).filter(Boolean))];
 }
 
 function writeField(name, value) {
@@ -97,11 +102,12 @@ function isKnownProfilePageUrl(value) {
 function sanitizePhotoHints(payload) {
   const cleaned = {
     ...payload,
+    profileUrls: [...payload.profileUrls],
     photoHints: []
   };
   const warnings = [];
   const invalidImageHints = [];
-  const profilePageHints = [];
+  const movedProfilePageHints = [];
 
   for (const hint of payload.photoHints) {
     if (isDirectImageUrl(hint)) {
@@ -110,22 +116,70 @@ function sanitizePhotoHints(payload) {
     }
 
     if (isKnownProfilePageUrl(hint)) {
-      profilePageHints.push(hint);
+      cleaned.profileUrls.push(hint);
+      movedProfilePageHints.push(hint);
       continue;
     }
 
     invalidImageHints.push(hint);
   }
 
-  if (profilePageHints.length > 0) {
-    warnings.push("Ignored photo hints that were profile pages, not image files. Use a direct public image URL ending in .jpg, .jpeg, .png, .webp, or .gif.");
+  cleaned.photoHints = dedupeEntries(cleaned.photoHints);
+  cleaned.profileUrls = dedupeEntries(cleaned.profileUrls);
+
+  if (movedProfilePageHints.length > 0) {
+    warnings.push("Moved profile page links out of the image field and into public profile URLs.");
   }
 
   if (invalidImageHints.length > 0) {
     warnings.push("Ignored photo hints that were not direct public image URLs.");
   }
 
-  if (cleaned.photoHints.length !== payload.photoHints.length) {
+  if (!sameList(cleaned.photoHints, payload.photoHints)) {
+    writeField("photoHints", cleaned.photoHints.join(", "));
+  }
+
+  if (!sameList(cleaned.profileUrls, payload.profileUrls)) {
+    writeField("profileUrls", cleaned.profileUrls.join(", "));
+  }
+
+  return {
+    payload: cleaned,
+    warnings
+  };
+}
+
+function sanitizeProfileUrls(payload) {
+  const cleaned = {
+    ...payload,
+    profileUrls: [],
+    photoHints: [...payload.photoHints]
+  };
+  const warnings = [];
+  const movedImageUrls = [];
+
+  for (const hint of payload.profileUrls) {
+    if (isDirectImageUrl(hint)) {
+      cleaned.photoHints.push(hint);
+      movedImageUrls.push(hint);
+      continue;
+    }
+
+    cleaned.profileUrls.push(hint);
+  }
+
+  cleaned.profileUrls = dedupeEntries(cleaned.profileUrls);
+  cleaned.photoHints = dedupeEntries(cleaned.photoHints);
+
+  if (movedImageUrls.length > 0) {
+    warnings.push("Moved direct image links out of public profile URLs and into the image field.");
+  }
+
+  if (!sameList(cleaned.profileUrls, payload.profileUrls)) {
+    writeField("profileUrls", cleaned.profileUrls.join(", "));
+  }
+
+  if (!sameList(cleaned.photoHints, payload.photoHints)) {
     writeField("photoHints", cleaned.photoHints.join(", "));
   }
 
@@ -153,6 +207,7 @@ function readFormPayload() {
     handles: splitList(String(data.get("handles") || "")),
     bioKeywords: splitList(String(data.get("bioKeywords") || "")),
     locationHints: splitList(String(data.get("locationHints") || "")),
+    profileUrls: splitList(String(data.get("profileUrls") || "")),
     photoHints: splitList(String(data.get("photoHints") || ""))
   };
 }
@@ -163,6 +218,7 @@ function stripDemoArtifacts(payload) {
     handles: [...payload.handles],
     bioKeywords: [...payload.bioKeywords],
     locationHints: [...payload.locationHints],
+    profileUrls: [...payload.profileUrls],
     photoHints: [...payload.photoHints]
   };
 
@@ -250,6 +306,7 @@ function hasUserClues(payload) {
       payload.handles.length ||
       payload.bioKeywords.length ||
       payload.locationHints.length ||
+      payload.profileUrls.length ||
       payload.photoHints.length
   );
 }
@@ -342,6 +399,10 @@ async function runSearch(payload) {
     warnings.push(`Ignored ${stripped.removed.join(", ")} left over from Load Demo.`);
   }
 
+  const sanitizedProfiles = sanitizeProfileUrls(effectivePayload);
+  effectivePayload = sanitizedProfiles.payload;
+  warnings.push(...sanitizedProfiles.warnings);
+
   const sanitizedPhotos = sanitizePhotoHints(effectivePayload);
   effectivePayload = sanitizedPhotos.payload;
   warnings.push(...sanitizedPhotos.warnings);
@@ -356,7 +417,7 @@ async function runSearch(payload) {
     results.innerHTML =
       warnings.length > 0
         ? "<p>Search needs a usable clue. Direct photo hints must be public image URLs ending in .jpg, .jpeg, .png, .webp, or .gif.</p>"
-        : "<p>Add at least a name, handle, location hint, keyword, or public photo URL.</p>";
+        : "<p>Add at least a name, handle, location hint, keyword, public profile URL, or public photo URL.</p>";
     resultMeta.textContent = warnings.length > 0 ? "Search needs a usable clue." : "Search needs at least one clue.";
     return;
   }
