@@ -306,6 +306,31 @@ const SOCIAL_PROFILE_DOMAINS = [
   "letterboxd.com",
   "goodreads.com"
 ];
+const HIGH_SIGNAL_SOCIAL_DOMAINS = [
+  "facebook.com",
+  "github.com",
+  "reddit.com",
+  "x.com",
+  "twitter.com",
+  "bsky.app",
+  "snapchat.com",
+  "linktr.ee",
+  "soundcloud.com",
+  "twitch.tv",
+  "medium.com"
+];
+const VISUAL_COMMUNITY_DOMAINS = [
+  "instagram.com",
+  "threads.net",
+  "tiktok.com",
+  "pinterest.com",
+  "vsco.co",
+  "youtube.com",
+  "behance.net",
+  "dribbble.com",
+  "flickr.com",
+  "letterboxd.com"
+];
 
 export function dedupe(values) {
   return [...new Set(values.filter(Boolean))];
@@ -393,6 +418,45 @@ function buildProfileUrlSearchPlans(profileUrls) {
       return [];
     }
   });
+}
+
+function buildNameDiscoveryPlans(name, locationTerms) {
+  const plans = [
+    {
+      label: "Name exact",
+      q: clipText(`"${name}"`, 220)
+    },
+    {
+      label: "Name on high-signal social profiles",
+      q: clipText(`"${name}" profile`, 220),
+      domains: HIGH_SIGNAL_SOCIAL_DOMAINS
+    },
+    {
+      label: "Name on visual/community profiles",
+      q: clipText(`"${name}" profile`, 220),
+      domains: VISUAL_COMMUNITY_DOMAINS
+    },
+    {
+      label: "Name on broader public profiles",
+      q: clipText(`"${name}"`, 220),
+      domains: BROADER_PROFILE_DOMAINS
+    }
+  ];
+
+  if (locationTerms.length > 0) {
+    const limitedLocationTerms = locationTerms.slice(0, 3).map((term) => `"${term}"`).join(" ");
+    plans.push({
+      label: "Name and location on high-signal social profiles",
+      q: clipText(`"${name}" ${limitedLocationTerms}`, 220),
+      domains: HIGH_SIGNAL_SOCIAL_DOMAINS
+    });
+    plans.push({
+      label: "Name and location",
+      q: clipText(`"${name}" ${limitedLocationTerms}`, 220)
+    });
+  }
+
+  return plans;
 }
 
 function buildHandleQuery(handle) {
@@ -500,6 +564,11 @@ export function buildSearchPlans(query) {
       label: `Handle ${handle}`,
       q: buildHandleQuery(handle)
     });
+    plans.push({
+      label: `Handle ${handle} on high-signal social profiles`,
+      q: buildHandleQuery(handle),
+      domains: HIGH_SIGNAL_SOCIAL_DOMAINS
+    });
   }
 
   for (const photoHint of query.photoHints.slice(0, 2)) {
@@ -512,29 +581,7 @@ export function buildSearchPlans(query) {
   }
 
   if (query.name) {
-    plans.push({
-      label: "Name exact",
-      q: clipText(`"${query.name}"`, 220)
-    });
-
-    plans.push({
-      label: "Name on social profiles",
-      q: clipText(`"${query.name}"`, 220),
-      domains: SOCIAL_PROFILE_DOMAINS
-    });
-
-    plans.push({
-      label: "Name on broader public profiles",
-      q: clipText(`"${query.name}"`, 220),
-      domains: BROADER_PROFILE_DOMAINS
-    });
-
-    if (locationTerms.length > 0) {
-      plans.push({
-        label: "Name and location",
-        q: clipText(`"${query.name}" ${locationTerms.slice(0, 3).map((term) => `"${term}"`).join(" ")}`, 220)
-      });
-    }
+    plans.push(...buildNameDiscoveryPlans(query.name, locationTerms));
 
     if (query.bioKeywords.length > 0) {
       plans.push({
@@ -555,7 +602,7 @@ export function buildSearchPlans(query) {
     }
   }
 
-  return dedupe(plans.map((plan) => JSON.stringify(plan))).map((plan) => JSON.parse(plan)).slice(0, 8);
+  return dedupe(plans.map((plan) => JSON.stringify(plan))).map((plan) => JSON.parse(plan)).slice(0, 12);
 }
 
 export function mapSearchResultsToCandidates(results, plan, mapper) {

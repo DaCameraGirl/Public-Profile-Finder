@@ -9,8 +9,25 @@ const WEIGHTS = {
   bioKeyword: 5,
   locationOverlap: 12,
   locationConflict: 14,
+  accessLimitedPenalty: 10,
+  privateProfilePenalty: 6,
   photoReuse: 20
 };
+const LOGIN_WALL_MARKERS = [
+  "log in",
+  "login",
+  "sign in",
+  "open app",
+  "join to view",
+  "sign up to see",
+  "see instagram photos and videos"
+];
+const PRIVATE_PROFILE_MARKERS = [
+  "this profile is private",
+  "private profile",
+  "private account",
+  "follow to see"
+];
 
 function normalizeText(value) {
   return String(value || "")
@@ -139,6 +156,18 @@ function getStateTokens(values) {
   return values.filter((token) => token.startsWith("state:"));
 }
 
+function detectAccessLimitations(candidate) {
+  const text = normalizeText([candidate.displayName, candidate.bio, candidate.publicText].filter(Boolean).join(" "));
+  const loginWall = LOGIN_WALL_MARKERS.some((marker) => text.includes(marker));
+  const privateProfile = PRIVATE_PROFILE_MARKERS.some((marker) => text.includes(marker));
+
+  return {
+    loginWall,
+    privateProfile,
+    any: loginWall || privateProfile
+  };
+}
+
 function passesFilter(query, candidate, sourceMode) {
   const thresholds =
     sourceMode === "live"
@@ -157,6 +186,16 @@ function passesFilter(query, candidate, sourceMode) {
 
   if (signals.exactHandle && !signals.nameConflict) {
     return true;
+  }
+
+  if (sourceMode === "live" && candidate.accessLimited?.any) {
+    if (!signals.exactProfileUrl && !signals.exactHandle && signals.signalCount < 2) {
+      return false;
+    }
+
+    if (!signals.exactProfileUrl && !signals.exactHandle && signals.exactName && signals.signalCount === 1) {
+      return false;
+    }
   }
 
   if (signals.exactName) {
@@ -197,6 +236,7 @@ export function scoreCandidate(query, candidate) {
   const candidateHandle = normalizeText(candidate.username);
   const candidateName = normalizeText(candidate.displayName);
   const candidateProfileUrl = normalizeProfileUrl(candidate.profileUrl);
+  const accessLimited = detectAccessLimitations(candidate);
   const candidateBioTokens = new Set(tokenize(candidate.bio || candidate.publicText));
   const candidateLocationTokens = new Set(buildLocationTokens(candidate.location || candidate.publicText));
   const candidatePhotos = new Set([
@@ -270,6 +310,16 @@ export function scoreCandidate(query, candidate) {
     reasons.push(`Same public photo fingerprint: ${sharedPhotos.join(", ")}`);
   }
 
+  if (accessLimited.loginWall) {
+    score = Math.max(0, score - WEIGHTS.accessLimitedPenalty);
+    reasons.push("Public page looks login-gated");
+  }
+
+  if (accessLimited.privateProfile) {
+    score = Math.max(0, score - WEIGHTS.privateProfilePenalty);
+    reasons.push("Profile appears private");
+  }
+
   const sharedNameTokens = exactName ? unique(tokenize(query.name)) : unique(tokenize(query.name)).filter((token) => candidateName.includes(token));
   if (nameConflict) {
     reasons.push(`Known handle and public name do not strongly align`);
@@ -302,6 +352,7 @@ export function scoreCandidate(query, candidate) {
     score: finalScore,
     reasons,
     signals,
+    accessLimited,
     matchTier: buildMatchTier(finalScore, signals)
   };
 }
