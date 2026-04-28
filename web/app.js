@@ -405,6 +405,18 @@ function updateModeGuide() {
     "<strong>Free mode:</strong> build search links, open them in Google/Bing/DuckDuckGo, then paste any public profile URLs you find back into this app for local scoring.";
 }
 
+function shouldFallbackToStaticSearch(error) {
+  const message = String(error?.message || "").toLowerCase();
+
+  return (
+    message.includes("429") ||
+    message.includes("quota") ||
+    message.includes("rate limit") ||
+    message.includes("too many requests") ||
+    message.includes("serpapi returned 429")
+  );
+}
+
 function hasUserClues(payload) {
   return Boolean(
     payload.name ||
@@ -845,7 +857,29 @@ async function runSearch(payload) {
   manualSearchWrap.hidden = true;
   manualSearchWrap.innerHTML = "";
 
-  const result = runtime.backendAvailable ? await searchWithApi(effectivePayload) : buildStaticPayload(effectivePayload);
+  let result;
+
+  if (runtime.backendAvailable) {
+    try {
+      result = await searchWithApi(effectivePayload);
+    } catch (error) {
+      if (!shouldFallbackToStaticSearch(error)) {
+        throw error;
+      }
+
+      runtime.backendAvailable = false;
+      renderSourceState(getStaticSourceStatus(false));
+      updatePrimaryActionLabel();
+      updateModeGuide();
+      showFormWarning("Live search is exhausted right now. Switched to free browser mode instead.");
+      resultMeta.textContent = "Live search limit reached. Building browser-side results...";
+      results.innerHTML = "<p>Preparing free search links and local scoring...</p>";
+      result = buildStaticPayload(effectivePayload);
+    }
+  } else {
+    result = buildStaticPayload(effectivePayload);
+  }
+
   renderSourceState(result.source);
   renderResults(result);
 }
