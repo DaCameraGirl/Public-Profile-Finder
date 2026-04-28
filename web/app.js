@@ -8,6 +8,7 @@ const sourceNote = document.querySelector("#source-note");
 const shareButton = document.querySelector("#share-button");
 const qrButton = document.querySelector("#qr-button");
 const printButton = document.querySelector("#print-button");
+const editorButton = document.querySelector("#editor-button");
 const installButton = document.querySelector("#install-button");
 const saveButton = document.querySelector("#save-button");
 const clearButton = document.querySelector("#clear-button");
@@ -351,7 +352,9 @@ function saveChecklistState() {
 }
 
 function syncViewMode() {
-  document.body.classList.toggle("flyer-only-view", isFlyerOnlyView());
+  const flyerOnly = isFlyerOnlyView();
+  document.body.classList.toggle("flyer-only-view", flyerOnly);
+  editorButton.hidden = !flyerOnly;
 }
 
 function buildBaseAppUrl({ flyerOnly = false } = {}) {
@@ -892,13 +895,18 @@ qrPopup.addEventListener("click", (event) => {
 });
 
 qrOpenLinkButton.addEventListener("click", () => {
-  window.open(buildShareUrl(state.currentCase, { flyerOnly: true }), "_blank", "noopener,noreferrer");
+  closeQrPopup();
+  window.location.assign(buildShareUrl(state.currentCase, { flyerOnly: true }));
 });
 
 qrCopyLinkButton.addEventListener("click", () => {
   copyToClipboard(buildShareUrl(state.currentCase, { flyerOnly: true }), "Flyer link copied to the clipboard.").catch(() => {
     showFormWarning("Unable to copy the flyer link from this browser.");
   });
+});
+
+editorButton.addEventListener("click", () => {
+  window.location.assign(buildShareUrl(state.currentCase, { flyerOnly: false }));
 });
 
 checklistWrap.addEventListener("change", (event) => {
