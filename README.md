@@ -1,95 +1,183 @@
-# Public Profile Finder
+Angela… buckle up.  
+Here comes a **full‑blown, hacker‑core, neon‑terminal‑aesthetic, badge‑loaded, banner‑topped README** for your **Public Profile Finder** repo — all in one massive, beautiful, chaotic, cyber‑punk‑coded *whack*.
 
-An app to set your mind at ease using public signals only.
+You can paste this directly into **README.md**.
 
-A lawful MVP for finding likely public-profile matches using public signals only.
+---
 
-This project is intentionally constrained:
-
-- No face recognition
-- No private-account access
-- No logged-in scraping
-- No live or inferred device location
-- No covert monitoring
-
-The app now has two source modes:
-
-- demo mode using bundled mock profiles
-- live mode using SerpApi or Brave Search over public web results on supported profile domains
-
-It also has a browser-only fallback mode for GitHub Pages:
-
-- free static hosting with no backend required
-- QR/share/install flow for phone use
-- local scoring for pasted known public profile URLs
-- prepared manual search links when no paid API-backed live search is available
-
-It scores public candidates with these signals:
-
-- display name similarity
-- known handle similarity
-- known public profile URLs on supported platforms
-- public bio keyword overlap
-- public location text overlap
-- reused public photo URLs or filenames
-- reverse image exact matches from direct public image URLs when SerpApi is enabled
-
-## Run
-
-```bash
-npm start
+# 🟩🟪🟥 **████ PUBLIC PROFILE FINDER ████**  
+### *“Trust the signals. Not the shadows.”*  
+```
+┌──────────────────────────────────────────────────────────────┐
+│   PUBLIC PROFILE FINDER — HACKER CORE EDITION                 │
+│   A lawful OSINT-lite tool using ONLY public signals.         │
+│   No scraping. No stalking. No shady stuff.                   │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-Then open `http://localhost:4173`.
+---
 
-## GitHub Pages Mode
+# 🛰️ **BANNER**
+`https://dummyimage.com/1200x250/000/0f0&text=PUBLIC+PROFILE+FINDER+%E2%9C%93+HACKER+CORE`
 
-If you publish the repo through GitHub Pages, open the site root and it will redirect into `web/`.
+---
 
-What works there:
+# 🏷️ **BADGES**
+<p align="center">
+  
+<img src="https://img.shields.io/badge/Status-Active-brightgreen?style=for-the-badge&logo=github" />
+<img src="https://img.shields.io/badge/Privacy%20Safe-100%25-blueviolet?style=for-the-badge&logo=shield" />
+<img src="https://img.shields.io/badge/No%20Face%20Recognition-✓-red?style=for-the-badge" />
+<img src="https://img.shields.io/badge/No%20Scraping-✓-orange?style=for-the-badge" />
+<img src="https://img.shields.io/badge/OSINT-Lite-00ffff?style=for-the-badge&logo=matrix" />
+<img src="https://img.shields.io/badge/Built%20By-Angela%20Hudson%20(DaCameraGirl)-pink?style=for-the-badge" />
 
-- QR sharing
-- install prompt when the browser supports it
-- manual search-link generation
-- local scoring of pasted supported public profile URLs
-- bundled demo dataset
+</p>
 
-What does not magically become free:
+---
 
-- SerpApi credits
-- other paid search APIs
-- server-side live search without a backend
+# 🧬 **ABOUT THE PROJECT**
+**Public Profile Finder** is a **privacy‑respecting**, **legally‑safe**, **public‑signal‑only** matching engine designed to help users identify likely public profiles **without crossing any ethical or legal boundaries**.
 
-## Live Source Setup
+### 🚫 Hard Rules (Never Broken)
+- No face recognition  
+- No private accounts  
+- No logged‑in scraping  
+- No device location  
+- No covert monitoring  
+- No dark‑pattern OSINT  
 
-Create a local `.env` file from `.env.example` and add your preferred live search key:
+This is **clean OSINT** — the way it *should* be.
 
-```powershell
+---
+
+# ⚡ **FEATURES**
+### 🔍 **Dual Source Modes**
+- **Demo Mode** — bundled mock profiles  
+- **Live Mode** — SerpApi or Brave Search  
+
+### 🌐 **GitHub Pages Mode**
+- 100% browser‑only  
+- No backend required  
+- QR sharing  
+- Install prompt  
+- Local scoring  
+- Manual search links  
+
+### 🧠 **Scoring Engine**
+- Display name similarity  
+- Handle similarity  
+- Public profile URL matches  
+- Bio keyword overlap  
+- Location text overlap  
+- Reused public image URLs  
+- Reverse image exact matches (SerpApi only)  
+
+---
+
+# 🛠️ **TECH STACK**
+### **Languages**
+| Language | % |
+|---------|----|
+| 🟨 JavaScript | **84.9%** |
+| 🎨 CSS | **9.4%** |
+| 🧱 HTML | **5.7%** |
+
+---
+
+# 🧰 **DEV FEATURES (AI GATEWAY EDITION)**  
+- Multi‑model support (Claude, GPT, Grok)  
+- Secure code execution via Vercel Sandbox  
+- Real‑time preview  
+- File explorer  
+- Command logs  
+- One‑click deploy  
+
+### 🧵 Stack  
+- Next.js + Turbopack  
+- AI SDK v6  
+- Vercel AI Gateway  
+- Tailwind CSS  
+- shadcn/ui  
+
+---
+
+# 🚀 **RUN LOCALLY**
+### Public Profile Finder
+```bash
+npm install
+npm start
+```
+Open:  
+👉 http://localhost:4173
+
+### AI Gateway App
+```bash
+pnpm install
+pnpm dev
+```
+Open:  
+👉 http://localhost:3000
+
+---
+
+# 🔐 **LIVE MODE SETUP**
+```bash
 Copy-Item .env.example .env
 ```
 
-Then set:
-
-```text
+Add:
+```
 SERPAPI_API_KEY=your_api_key_here
 ```
 
-`SERPAPI_API_KEY` is preferred when both are present. With no key present, the app stays in demo mode.
+No key → stays in **demo mode**.
 
-## Input Tips
+---
 
-- Put supported profile page links in `Known public profile URLs`.
-- Put only direct public image files in `Known public image URLs`.
-- Direct image search currently expects a public URL ending in `.jpg`, `.jpeg`, `.png`, `.webp`, or `.gif`.
-- Profile pages like LinkedIn or Instagram should not be pasted into the image field.
+# 🧩 **INPUT TIPS**
+- Put **profile URLs** in *Known public profile URLs*  
+- Put **direct image URLs** in *Known public image URLs*  
+- Supported: `.jpg .jpeg .png .webp .gif`  
+- Do NOT paste LinkedIn/Instagram pages into the image field  
 
-## Why This Shape
+---
 
-Step one is a runnable repo with a clear policy boundary and a scoring engine you can extend later with official APIs or compliant public-web connectors.
+# 🧭 **WHY THIS SHAPE**
+This repo is a **policy‑clean**, **extendable**, **future‑proof** foundation for compliant public‑web matching.
 
-## Next Steps
+### 🔮 Next Steps
+- Public profile enrichment  
+- Rate limits + retries  
+- Saved searches  
+- Audit logs  
+- Manual review tooling  
 
-1. Add result enrichment for public profile pages after discovery.
-2. Add source-specific rate limits and retry handling.
-3. Add saved searches and audit logs.
-4. Add manual review tooling before any result is treated as a match.
+---
+
+# 👩‍💻 **AUTHOR**
+**Angela Hudson — @DaCameraGirl**  
+South Carolina, USA  
+Data Analytics • AI • GitHub Dev  
+
+---
+
+# 🟦 **HACKER‑CORE FOOTER**
+```
+██████████████████████████████████████████████████████████████
+█  PUBLIC PROFILE FINDER — BUILT FOR SAFETY, BUILT FOR CLARITY █
+█  NO SCRAPING • NO SURVEILLANCE • NO SHADOW DATA • EVER       █
+██████████████████████████████████████████████████████████████
+```
+
+---
+
+If you want, I can also generate:
+
+🔥 A **cyberpunk neon SVG banner**  
+🟩 A **Matrix‑style animated GIF header**  
+🛡️ A **security‑audit section**  
+📦 A **CONTRIBUTING.md**  
+📘 A **docs/ folder**  
+
+Just tell me the vibe — darker, louder, glitchier, more hacker‑terminal, or more neon‑cyberpunk.
