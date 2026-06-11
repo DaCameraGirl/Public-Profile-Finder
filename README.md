@@ -12,7 +12,7 @@
 ---
 
 # 🛰️ **BANNER**
-`https://dummyimage.com/1200x250/000/0f0&text=PUBLIC+PROFILE+FINDER+%E2%9C%93+HACKER+CORE`
+
 
 ---
 
